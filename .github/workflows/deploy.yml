@@ -1,0 +1,52 @@
+# .github/workflows/deploy.yml
+name: Deploy to GitHub Pages
+
+on:
+  # 當有程式碼 push 到 main 分支時觸發 (如果你的主分支叫 master，請改為 master)
+  push:
+    branches: [ main ] 
+
+# 設定 GITHUB_TOKEN 的權限，允許將打包後的檔案推送到 Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 確保不會同時有多個部署任務互相干擾
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm' # 使用 npm 快取加速部署
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build project
+        run: npm run build
+        
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Upload Build Artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist' # Vite 預設打包出來的資料夾
+          
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

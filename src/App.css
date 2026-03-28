@@ -1,0 +1,418 @@
+/* frontend/src/App.css */
+
+/* =========================================
+   1. 全域與強制亮色模式設定
+   ========================================= */
+:root {
+  color-scheme: light !important;
+  /* 強制關閉暗色模式跟隨，永遠保持亮色 */
+}
+
+body {
+  margin: 0;
+  font-family: 'PingFang TC', 'Microsoft JhengHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f4f7f6 !important;
+  /* 強制亮色背景 */
+  color: #333 !important;
+  /* 強制深色文字 */
+}
+
+.admin-gladiator-dashboard {
+  padding: 20px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* =========================================
+   2. 頂部標題與選單 (Header & Selector)
+   ========================================= */
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+header h1 {
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-size: 2.2em;
+}
+
+header p {
+  color: #7f8c8d;
+  font-size: 1.1em;
+  margin-bottom: 15px;
+}
+
+.year-selector {
+  margin-top: 0px;
+  background-color: #fff;
+  display: inline-block;
+  padding: 10px 25px;
+  border-radius: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e0e0e0;
+}
+
+.year-selector label {
+  font-weight: bold;
+  color: #2c3e50;
+  margin-right: 12px;
+}
+
+.year-selector select {
+  font-size: 16px;
+  padding: 6px 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  outline: none;
+  cursor: pointer;
+  background-color: #f9f9f9;
+  transition: border-color 0.2s;
+}
+
+.year-selector select:focus {
+  border-color: #3498db;
+}
+
+.controls-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-top: 15px;
+}
+
+.dimension-selector {
+  display: flex;
+  background-color: #ecf0f1;
+  padding: 5px;
+  border-radius: 30px;
+}
+
+.dimension-selector button {
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #7f8c8d;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: all 0.2s;
+}
+
+.dimension-selector button.active {
+  background-color: #fff;
+  color: #3498db;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* =========================================
+   3. 儀表板主要排版 (Dashboard Layout)
+   ========================================= */
+.dashboard-content {
+  display: flex;
+  gap: 30px;
+  height: calc(100vh - 200px);
+  min-height: 600px;
+}
+
+/* =========================================
+   4. 左側區塊：排行榜表格 (Leaderboard)
+   ========================================= */
+.leaderboard-section {
+  flex: 0 0 45%;
+  background: #fff;
+  padding: 20px 25px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.leaderboard-section h2 {
+  color: #e74c3c;
+  border-bottom: 2px solid #e74c3c;
+  padding-bottom: 12px;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.leaderboard-controls {
+  display: flex;
+  flex-direction: column;
+  /* 垂直排列 */
+  align-items: center;
+  /* 水平置中 */
+  gap: 15px;
+  /* 年度與維度之間的間距 */
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px dashed #ecf0f1;
+  /* 加一條虛線讓視覺跟排行榜分開，更有質感 */
+  width: 100%;
+}
+
+.table-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  border-bottom: 1px solid #eee;
+  /* 底部加個收邊會比較好看 */
+}
+
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* 徹底修復表頭視覺穿透問題 */
+thead {
+  background-color: #ecf0f1;
+}
+
+.ranking-table th {
+  background-color: #ecf0f1 !important;
+  /* 強制實心背景色 */
+  text-align: left;
+  padding: 14px 12px;
+  font-weight: 600;
+  position: sticky;
+  /* 黏性定位 */
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+  /* 利用陰影建立實線，阻斷下方資料穿透 */
+}
+
+.ranking-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.ranking-table tr:hover td {
+  background-color: #fbfcfc;
+}
+
+.ranking-table .rank-cell {
+  font-weight: bold;
+  color: #7f8c8d;
+}
+
+.ranking-table .dept-id-cell {
+  font-family: monospace;
+  font-size: 1.1em;
+  color: #34495e;
+}
+
+.ranking-table .r-score-cell {
+  color: #e74c3c;
+  font-weight: bold;
+  font-size: 1.15em;
+}
+
+.ranking-table .sigma-cell {
+  color: #95a5a6;
+  font-size: 0.9em;
+}
+
+/* 點擊連動時的活性行樣式 */
+.ranking-table .active-row td {
+  background-color: #fdf2f1 !important;
+  border-left: none;
+}
+
+.ranking-table .active-row td:first-child {
+  border-left: 4px solid #e74c3c !important;
+  padding-left: 8px !important;
+}
+
+/* =========================================
+   5. 右側區塊：關係圖 (Network Graph)
+   ========================================= */
+.graph-section {
+  flex: 1;
+  background: #fff;
+  padding: 20px 25px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 12px;
+  margin-top: 0;
+  margin-bottom: 15px;
+}
+
+.graph-section h2 {
+  color: #3498db;
+  border-bottom: none;
+  padding-bottom: 0px;
+  margin-top: 0;
+}
+
+.fullscreen-toggle-btn {
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  padding: 6px 14px;
+  border-radius: 20px;
+  color: #555;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fullscreen-toggle-btn:hover {
+  background-color: #3498db;
+  color: #fff;
+  border-color: #3498db;
+  box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
+}
+
+.graph-help {
+  color: #7f8c8d;
+  font-size: 0.95em;
+  margin-bottom: 15px;
+}
+
+/* Vis.js 容器 */
+.vis-network-container {
+  flex: 1;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  background-color: #fafbfc;
+  outline: none;
+  height: 100%;
+  min-height: 400px;
+  overflow: hidden;
+}
+
+/* =========================================
+   💡 質感彈出視窗模式 (Modal Mode) 💡
+   ========================================= */
+
+/* 暗色背景遮罩 (帶有毛玻璃效果) */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  /* 半透明黑 */
+  backdrop-filter: blur(4px);
+  /* 背景模糊化，這招超級有質感 */
+  z-index: 9998;
+  /* 放在圖表下方，其他內容上方 */
+  animation: fadeIn 0.3s ease;
+}
+
+/* 讓原本的圖表區塊變成彈出視窗 */
+.graph-section.modal-mode {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* 絕對置中魔法 */
+
+  /* 不要佔滿整個螢幕，留出邊距才像視窗 */
+  width: 85vw;
+  height: 85vh;
+  max-width: 1400px;
+  /* 限制最大寬度，避免在大螢幕上大到失控 */
+
+  z-index: 9999;
+  /* 最上層 */
+  border-radius: 16px;
+  /* 視窗圓角加大 */
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  /* 給一個非常深邃的立體陰影 */
+  flex: none;
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  /* 帶有微彈跳感的出現動畫 */
+}
+
+/* 視窗模式下的關閉按鈕，讓它看起來像個真正的關閉鍵 */
+.graph-section.modal-mode .fullscreen-toggle-btn {
+  background-color: #fff;
+  color: #e74c3c;
+  border-color: #e74c3c;
+  font-weight: bold;
+}
+
+.graph-section.modal-mode .fullscreen-toggle-btn:hover {
+  background-color: #e74c3c;
+  color: #fff;
+}
+
+/* 進場動畫設定 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -45%) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* --- 空狀態提示 (Empty State) --- */
+.empty-state-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #fafbfc;
+  border: 2px dashed #dcdde1;
+  border-radius: 8px;
+  color: #7f8c8d;
+  text-align: center;
+  padding: 20px;
+}
+
+.empty-state-placeholder .placeholder-icon {
+  font-size: 3em;
+  margin-bottom: 15px;
+  animation: bounceLeft 1.5s infinite;
+  /* 加上一個指引的小動畫 */
+}
+
+.empty-state-placeholder h3 {
+  margin: 0 0 10px 0;
+  color: #34495e;
+}
+
+@keyframes bounceLeft {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(-10px);
+  }
+}
