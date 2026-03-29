@@ -19,8 +19,8 @@ body {
 
 .admin-gladiator-dashboard {
   padding: 20px 40px;
-  max-width: 1400px;
-  margin: 0 auto;
+  /* max-width: 2000px; */
+  /* margin: 0 auto; */
 }
 
 /* =========================================
@@ -208,6 +208,12 @@ thead {
 
 .ranking-table .r-score-cell {
   color: #e74c3c;
+  font-weight: bold;
+  font-size: 1.15em;
+}
+
+.ranking-table .avg-score-cell {
+  color: #00af0c;
   font-weight: bold;
   font-size: 1.15em;
 }

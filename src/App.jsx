@@ -77,7 +77,7 @@ function App() {
       .map(node => {
         const rankingInfo = rankings.find(r => r.id === node.id);
         // 如果有找到對應的排名資料，就在名稱後面加上換行符號與 R 值
-        const rScoreText = rankingInfo ? `\n⭐ R-Score: ${rankingInfo.r_score}` : '';
+        const rScoreText = rankingInfo ? `\n⭐ R-Score: ${rankingInfo.r_score}\n⭐ 錄取分數: ${rankingInfo.avg_score}` : '';
         return {
           ...node,
           label: `${node.label}${rScoreText}`
@@ -145,8 +145,8 @@ function App() {
   return (
     <div className="admin-gladiator-dashboard">
       <header>
-        <h1>分發競技場: 大學 TrueSkill 魅力排行榜</h1>
-        <p>基於真實考生選擇，提供學校、校系、系組三個維度的熱門度排名。</p>
+        {/* <h1>分發競技場: 大學 TrueSkill 魅力排行榜</h1>
+        <p>基於真實考生選擇，提供學校、校系、系組三個維度的熱門度排名。</p> */}
 
         {years.length > 0 && (
           <div className="controls-container">
@@ -179,9 +179,10 @@ function App() {
             <table className="ranking-table">
               <thead>
                 <tr>
-                  <th style={{ width: '15%', textAlign: 'center' }}>排名</th>
+                  <th style={{ width: '10%', textAlign: 'center' }}>排名</th>
                   <th style={{ textAlign: 'left' }}>{selectedDimension === 'school' ? '學校' : selectedDimension === 'dept' ? '校系' : '系組'}</th>
-                  <th style={{ width: '25%', textAlign: 'left' }}>R-Score</th>
+                  <th style={{ width: '15%', textAlign: 'left' }}>R-Score</th>
+                  <th style={{ width: '17%', textAlign: 'left' }}>錄取分數</th>
                 </tr>
               </thead>
               <tbody>
@@ -194,6 +195,7 @@ function App() {
                     <td className="rank-cell" style={{ textAlign: 'center' }}>#{index + 1}</td>
                     <td className="dept-name-cell" style={{ textAlign: 'left' }}>{dept.name.replace(/\n/g, ' ')}</td>
                     <td className="r-score-cell" style={{ textAlign: 'left' }}>{dept.r_score}</td>
+                    <td className="avg-score-cell" style={{ textAlign: 'left' }}>{dept.avg_score}</td>
                   </tr>
                 ))}
               </tbody>
