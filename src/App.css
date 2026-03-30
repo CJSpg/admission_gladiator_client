@@ -130,12 +130,100 @@ header p {
   flex-direction: column;
 }
 
+.leaderboard-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #e74c3c;
+  padding-bottom: 12px;
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+.leaderboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .leaderboard-section h2 {
   color: #e74c3c;
-  border-bottom: 2px solid #e74c3c;
+  border-bottom: none;
   padding-bottom: 12px;
   margin-top: 0;
   flex-shrink: 0;
+}
+
+/* 清除排序按鈕 */
+.clear-sort-btn {
+  background-color: #fef9e7;
+  color: #f39c12;
+  border: 1px solid #f1c40f;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.clear-sort-btn:hover {
+  background-color: #f39c12;
+  color: #fff;
+}
+
+/* 搜尋框容器：用來絕對定位 X 按鈕 */
+.search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* 搜尋框裡的清除 X 按鈕 */
+.clear-search-btn {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #95a5a6;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.clear-search-btn:hover {
+  background-color: #ecf0f1;
+  color: #e74c3c;
+}
+
+.search-input {
+  padding: 8px 30px 8px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  font-size: 14px;
+  outline: none;
+  background-color: #f9f9f9;
+  color: #333;
+  width: 180px;
+  transition: all 0.3s ease;
+}
+
+.search-input:focus {
+  border-color: #3498db;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+  width: 220px;
+  /* 點擊時微微伸長，增加動態質感 */
+}
+
+.search-input::placeholder {
+  color: #aaa;
 }
 
 .leaderboard-controls {
@@ -182,6 +270,19 @@ thead {
   z-index: 10;
   box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
   /* 利用陰影建立實線，阻斷下方資料穿透 */
+}
+
+.ranking-table th.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  /* 防止連點兩下時反白文字 */
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.ranking-table th.sortable-header:hover {
+  background-color: #dcdde1 !important;
+  /* 滑過時讓背景微微加深 */
+  color: #2c3e50;
 }
 
 .ranking-table td {
@@ -421,4 +522,27 @@ thead {
   50% {
     transform: translateX(-10px);
   }
+}
+
+/* =========================================
+   💡 原始排名標籤 (Original Rank Badge)
+   ========================================= */
+.original-rank-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #ecf0f1;
+  color: #7f8c8d;
+  font-size: 0.75em;
+  border-radius: 4px;
+  font-weight: 600;
+  vertical-align: middle;
+  border: 1px solid #bdc3c7;
+}
+
+/* 當這行被選中時，標籤顏色跟著變，看起來更協調 */
+.active-row .original-rank-badge {
+  background-color: #fadbd8;
+  color: #c0392b;
+  border-color: #e6b0aa;
 }

@@ -11,6 +11,8 @@ function App() {
   const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
   const [selectedDept, setSelectedDept] = useState(null);
   const [isGraphFullScreen, setIsGraphFullScreen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'descending' });
 
   const visJsRef = useRef(null);
   const networkRef = useRef(null);
@@ -28,6 +30,9 @@ function App() {
 
   useEffect(() => {
     if (!selectedYear || !selectedDimension) return;
+
+    setSearchTerm('');
+    setSortConfig({ key: null, direction: 'descending' });
 
     Promise.all([
       fetch(`${import.meta.env.BASE_URL}rankings_${selectedYear}_${selectedDimension}.json`).then(res => res.json()),
@@ -86,6 +91,43 @@ function App() {
 
     return { nodes: relatedNodes, edges: relatedEdges };
   }, [graphData, selectedDept, rankings]); // 注意這裡把 rankings 加入了依賴陣列
+
+  const requestSort = (key) => {
+    let direction = 'descending'; // 預設點擊時從大到小排
+    if (sortConfig.key === key && sortConfig.direction === 'descending') {
+      direction = 'ascending'; // 如果已經是降冪，再次點擊就換成升冪
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const displayRankings = useMemo(() => {
+    let processedData = rankings
+      .map((dept, index) => ({ ...dept, originalRank: index + 1 }))
+      .filter(dept => dept.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    if (sortConfig.key) {
+      processedData.sort((a, b) => {
+        // 轉為數字以防字串比對錯誤，若無值則補 0
+        const aValue = Number(a[sortConfig.key]) || 0;
+        const bValue = Number(b[sortConfig.key]) || 0;
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return processedData;
+  }, [rankings, searchTerm, sortConfig]);
+
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) return ' ↕️'; // 尚未針對此欄位排序的預設圖示
+    return sortConfig.direction === 'ascending' ? ' 🔼' : ' 🔽';
+  };
 
   useEffect(() => {
     if (visJsRef.current && displayGraphData.nodes.length > 0) {
@@ -174,30 +216,89 @@ function App() {
 
       <div className="dashboard-content">
         <div className="leaderboard-section">
-          <h2>🏆 Top 排行榜</h2>
+          <div className="leaderboard-header-row">
+            <h2>🏆 Top 排行榜</h2>
+            <div className="leaderboard-actions">
+              {sortConfig.key && (
+                <button
+                  className="clear-sort-btn"
+                  onClick={() => setSortConfig({ key: null, direction: 'descending' })}
+                  title="恢復預設總榜排序"
+                >
+                  🔄 清除排序
+                </button>
+              )}
+              <div className="search-container">
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder="🔍 搜尋名稱..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button
+                    className="clear-search-btn"
+                    onClick={() => setSearchTerm('')}
+                    title="清除搜尋"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="table-scroll-container">
             <table className="ranking-table">
               <thead>
                 <tr>
-                  <th style={{ width: '10%', textAlign: 'center' }}>排名</th>
+                  <th style={{ width: '12%', textAlign: 'center' }}>目前排名</th>
                   <th style={{ textAlign: 'left' }}>{selectedDimension === 'school' ? '學校' : selectedDimension === 'dept' ? '校系' : '系組'}</th>
-                  <th style={{ width: '15%', textAlign: 'left' }}>R-Score</th>
-                  <th style={{ width: '17%', textAlign: 'left' }}>錄取分數</th>
+                  <th
+                    className="sortable-header"
+                    style={{ width: '20%', textAlign: 'left' }}
+                    onClick={() => requestSort('r_score')}
+                  >
+                    R-Score{getSortIcon('r_score')}
+                  </th>
+                  <th
+                    className="sortable-header"
+                    style={{ width: '22%', textAlign: 'left' }}
+                    onClick={() => requestSort('avg_score')}
+                  >
+                    錄取分數{getSortIcon('avg_score')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {rankings.map((dept, index) => (
+                {displayRankings.map((dept, index) => (
                   <tr
                     key={dept.id}
                     className={selectedDept === dept.id ? 'active-row' : ''}
                     onClick={() => setSelectedDept(dept.id)}
                   >
-                    <td className="rank-cell" style={{ textAlign: 'center' }}>#{index + 1}</td>
-                    <td className="dept-name-cell" style={{ textAlign: 'left' }}>{dept.name.replace(/\n/g, ' ')}</td>
+                    <td className="rank-cell" style={{ textAlign: 'center' }}>
+                      {index + 1}
+                    </td>
+                    <td className="dept-name-cell" style={{ textAlign: 'left' }}>
+                      {dept.name.replace(/\n/g, ' ')}
+                      {sortConfig.key && (
+                        <span className="original-rank-badge" title="總榜原始排名">
+                          總榜 #{dept.originalRank}
+                        </span>
+                      )}
+                    </td>
                     <td className="r-score-cell" style={{ textAlign: 'left' }}>{dept.r_score}</td>
                     <td className="avg-score-cell" style={{ textAlign: 'left' }}>{dept.avg_score}</td>
                   </tr>
                 ))}
+                {displayRankings.length === 0 && (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#7f8c8d' }}>
+                      找不到符合「{searchTerm}」的資料 🥲
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
