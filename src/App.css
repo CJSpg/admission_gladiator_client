@@ -18,9 +18,7 @@ body {
 }
 
 .admin-gladiator-dashboard {
-  padding: 20px 40px;
-  /* max-width: 2000px; */
-  /* margin: 0 auto; */
+  padding: 12px 20px;
 }
 
 /* =========================================
@@ -28,7 +26,7 @@ body {
    ========================================= */
 header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 12px;
 }
 
 header h1 {
@@ -44,7 +42,6 @@ header p {
 }
 
 .year-selector {
-  margin-top: 0px;
   background-color: #fff;
   display: inline-block;
   padding: 10px 25px;
@@ -79,7 +76,6 @@ header p {
   justify-content: center;
   align-items: center;
   gap: 20px;
-  margin-top: 15px;
 }
 
 .dimension-selector {
@@ -149,8 +145,7 @@ header p {
 .leaderboard-section h2 {
   color: #e74c3c;
   border-bottom: none;
-  padding-bottom: 12px;
-  margin-top: 0;
+  margin: 0;
   flex-shrink: 0;
 }
 
@@ -341,11 +336,13 @@ thead {
 .graph-section {
   flex: 1;
   background: #fff;
-  padding: 20px 25px;
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  position: relative;
 }
 
 .graph-header-row {
@@ -485,43 +482,149 @@ thead {
   }
 }
 
-/* --- 空狀態提示 (Empty State) --- */
-.empty-state-placeholder {
+/* --- Empty State --- */
+.empty-state {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: #fafbfc;
-  border: 2px dashed #dcdde1;
-  border-radius: 8px;
   color: #7f8c8d;
+  padding: 40px;
   text-align: center;
-  padding: 20px;
 }
 
-.empty-state-placeholder .placeholder-icon {
-  font-size: 3em;
-  margin-bottom: 15px;
-  animation: bounceLeft 1.5s infinite;
-  /* 加上一個指引的小動畫 */
+.empty-icon {
+  font-size: 60px;
+  margin-bottom: 30px;
 }
 
-.empty-state-placeholder h3 {
-  margin: 0 0 10px 0;
+.empty-state h3 {
+  margin: 0;
   color: #34495e;
 }
 
-@keyframes bounceLeft {
+/* --- Analysis Tabs --- */
+.analysis-tabs {
+  display: flex;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
 
-  0%,
-  100% {
-    transform: translateX(0);
-  }
+.tab-btn {
+  flex: 1;
+  padding: 12px 15px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #7f8c8d;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
 
-  50% {
-    transform: translateX(-10px);
-  }
+.tab-btn:hover {
+  background-color: #f1f2f6;
+  color: #e74c3c;
+}
+
+.tab-btn.active {
+  color: #e74c3c;
+  border-bottom-color: #e74c3c;
+  background-color: #fff;
+}
+
+/* --- Tab Content Container --- */
+.tab-content-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 15px;
+}
+
+/* --- Vis.js Graph Wrapper --- */
+.vis-container-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.vis-graph-title {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #e74c3c;
+  border: 1px solid #e0e0e0;
+  z-index: 10;
+}
+
+.vis-graph-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Recharts Charts Wrapper --- */
+.chart-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.chart-wrapper h3 {
+  margin: 0 0 5px 0;
+  color: #34495e;
+  font-size: 16px;
+  text-align: center;
+}
+
+.chart-wrapper .insight-tip {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
+  font-size: 13px;
+  background-color: #eaf2f8;
+  padding: 10px 15px;
+  border-radius: 6px;
+  border-left: 4px solid #3498db;
+  line-height: 1.4;
+}
+
+/* 針對 Scatter tooltip 的特殊樣式 */
+.scatter-tooltip {
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.scatter-tooltip p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.scatter-tooltip p.title {
+  font-weight: bold;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 2px;
 }
 
 /* =========================================
