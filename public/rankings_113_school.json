@@ -2,865 +2,1189 @@
   {
     "id": "101",
     "name": "國立臺灣科技大學",
-    "mu": 43.002,
-    "sigma": 1.086,
-    "r_score": 39.743,
-    "avg_score": 83.89
+    "mu": 35.969,
+    "sigma": 0.838,
+    "r_score": 33.454,
+    "avg_score": 83.889,
+    "yield_rate": 0.964,
+    "zheng_effect": 0.838,
+    "flow_rate": 0.036
   },
   {
     "id": "104",
     "name": "國立臺北科技大學",
-    "mu": 38.14,
-    "sigma": 0.863,
-    "r_score": 35.552,
-    "avg_score": 77.25
+    "mu": 33.199,
+    "sigma": 0.775,
+    "r_score": 30.873,
+    "avg_score": 77.252,
+    "yield_rate": 0.924,
+    "zheng_effect": 0.656,
+    "flow_rate": 0.076
   },
   {
     "id": "102",
     "name": "國立雲林科技大學",
-    "mu": 36.81,
-    "sigma": 0.85,
-    "r_score": 34.259,
-    "avg_score": 74.5
+    "mu": 32.849,
+    "sigma": 0.801,
+    "r_score": 30.446,
+    "avg_score": 74.495,
+    "yield_rate": 0.957,
+    "zheng_effect": 0.684,
+    "flow_rate": 0.043
   },
   {
     "id": "704",
     "name": "國立臺灣師範大學",
-    "mu": 36.581,
-    "sigma": 1.569,
-    "r_score": 31.874,
-    "avg_score": 80.28
+    "mu": 32.925,
+    "sigma": 1.036,
+    "r_score": 29.818,
+    "avg_score": 80.28,
+    "yield_rate": 0.868,
+    "zheng_effect": 0.491,
+    "flow_rate": 0.132
   },
   {
     "id": "804",
     "name": "中原大學",
-    "mu": 33.959,
-    "sigma": 1.187,
-    "r_score": 30.399,
-    "avg_score": "NaN"
+    "mu": 30.587,
+    "sigma": 0.99,
+    "r_score": 27.616,
+    "avg_score": "--",
+    "yield_rate": 0.986,
+    "zheng_effect": 0.671,
+    "flow_rate": 0.014
   },
   {
     "id": "111",
     "name": "國立臺北護理健康大學",
-    "mu": 32.457,
-    "sigma": 0.847,
-    "r_score": 29.916,
-    "avg_score": 70.07
-  },
-  {
-    "id": "706",
-    "name": "國立中興大學",
-    "mu": 36.4,
-    "sigma": 2.267,
-    "r_score": 29.601,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "807",
-    "name": "逢甲大學",
-    "mu": 31.675,
-    "sigma": 0.853,
-    "r_score": 29.117,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "707",
-    "name": "國立陽明交通大學",
-    "mu": 40.668,
-    "sigma": 4.065,
-    "r_score": 28.474,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "114",
-    "name": "國立臺北商業大學",
-    "mu": 30.865,
-    "sigma": 0.844,
-    "r_score": 28.333,
-    "avg_score": 75.87
-  },
-  {
-    "id": "708",
-    "name": "國立中央大學",
-    "mu": 41.141,
-    "sigma": 4.325,
-    "r_score": 28.167,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "713",
-    "name": "國立彰化師範大學",
-    "mu": 30.935,
-    "sigma": 1.132,
-    "r_score": 27.54,
-    "avg_score": 66.46
-  },
-  {
-    "id": "105",
-    "name": "國立高雄科技大學",
-    "mu": 29.659,
-    "sigma": 0.816,
-    "r_score": 27.21,
-    "avg_score": 65.61
-  },
-  {
-    "id": "112",
-    "name": "國立高雄餐旅大學",
-    "mu": 29.644,
-    "sigma": 0.848,
-    "r_score": 27.1,
-    "avg_score": 61.77
-  },
-  {
-    "id": "113",
-    "name": "國立臺中科技大學",
-    "mu": 29.484,
-    "sigma": 0.818,
-    "r_score": 27.029,
-    "avg_score": 69.71
-  },
-  {
-    "id": "815",
-    "name": "世新大學",
-    "mu": 30.641,
-    "sigma": 1.307,
-    "r_score": 26.72,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "729",
-    "name": "國立臺中教育大學",
-    "mu": 32.317,
-    "sigma": 1.97,
-    "r_score": 26.406,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "710",
-    "name": "國立臺灣海洋大學",
-    "mu": 30.943,
-    "sigma": 1.538,
-    "r_score": 26.328,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "823",
-    "name": "臺北醫學大學",
-    "mu": 36.294,
-    "sigma": 3.354,
-    "r_score": 26.232,
-    "avg_score": "NaN"
+    "mu": 29.814,
+    "sigma": 0.794,
+    "r_score": 27.433,
+    "avg_score": 70.068,
+    "yield_rate": 0.923,
+    "zheng_effect": 0.698,
+    "flow_rate": 0.077
   },
   {
     "id": "709",
     "name": "國立中山大學",
-    "mu": 36.2,
-    "sigma": 3.329,
-    "r_score": 26.213,
-    "avg_score": "NaN"
+    "mu": 34.517,
+    "sigma": 2.609,
+    "r_score": 26.69,
+    "avg_score": "--",
+    "yield_rate": 0.5,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.5
+  },
+  {
+    "id": "807",
+    "name": "逢甲大學",
+    "mu": 28.921,
+    "sigma": 0.776,
+    "r_score": 26.591,
+    "avg_score": "--",
+    "yield_rate": 0.883,
+    "zheng_effect": 0.517,
+    "flow_rate": 0.117
+  },
+  {
+    "id": "114",
+    "name": "國立臺北商業大學",
+    "mu": 28.583,
+    "sigma": 0.768,
+    "r_score": 26.277,
+    "avg_score": 75.869,
+    "yield_rate": 0.726,
+    "zheng_effect": 0.396,
+    "flow_rate": 0.274
+  },
+  {
+    "id": "706",
+    "name": "國立中興大學",
+    "mu": 31.377,
+    "sigma": 1.821,
+    "r_score": 25.915,
+    "avg_score": "--",
+    "yield_rate": 0.727,
+    "zheng_effect": 0.455,
+    "flow_rate": 0.273
+  },
+  {
+    "id": "713",
+    "name": "國立彰化師範大學",
+    "mu": 28.638,
+    "sigma": 0.98,
+    "r_score": 25.699,
+    "avg_score": 66.456,
+    "yield_rate": 0.935,
+    "zheng_effect": 0.581,
+    "flow_rate": 0.065
+  },
+  {
+    "id": "112",
+    "name": "國立高雄餐旅大學",
+    "mu": 28.066,
+    "sigma": 0.805,
+    "r_score": 25.651,
+    "avg_score": 61.77,
+    "yield_rate": 0.893,
+    "zheng_effect": 0.797,
+    "flow_rate": 0.107
+  },
+  {
+    "id": "708",
+    "name": "國立中央大學",
+    "mu": 39.196,
+    "sigma": 4.523,
+    "r_score": 25.626,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 1.0,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "815",
+    "name": "世新大學",
+    "mu": 28.221,
+    "sigma": 1.058,
+    "r_score": 25.046,
+    "avg_score": "--",
+    "yield_rate": 0.948,
+    "zheng_effect": 0.724,
+    "flow_rate": 0.052
+  },
+  {
+    "id": "113",
+    "name": "國立臺中科技大學",
+    "mu": 27.299,
+    "sigma": 0.771,
+    "r_score": 24.985,
+    "avg_score": 69.714,
+    "yield_rate": 0.901,
+    "zheng_effect": 0.581,
+    "flow_rate": 0.099
+  },
+  {
+    "id": "707",
+    "name": "國立陽明交通大學",
+    "mu": 37.384,
+    "sigma": 4.193,
+    "r_score": 24.806,
+    "avg_score": "--",
+    "yield_rate": 0.857,
+    "zheng_effect": 0.714,
+    "flow_rate": 0.143
+  },
+  {
+    "id": "710",
+    "name": "國立臺灣海洋大學",
+    "mu": 28.312,
+    "sigma": 1.208,
+    "r_score": 24.688,
+    "avg_score": "--",
+    "yield_rate": 0.85,
+    "zheng_effect": 0.525,
+    "flow_rate": 0.15
+  },
+  {
+    "id": "105",
+    "name": "國立高雄科技大學",
+    "mu": 26.71,
+    "sigma": 0.764,
+    "r_score": 24.42,
+    "avg_score": 65.612,
+    "yield_rate": 0.861,
+    "zheng_effect": 0.52,
+    "flow_rate": 0.139
+  },
+  {
+    "id": "823",
+    "name": "臺北醫學大學",
+    "mu": 34.362,
+    "sigma": 3.376,
+    "r_score": 24.235,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.75,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "729",
+    "name": "國立臺中教育大學",
+    "mu": 29.175,
+    "sigma": 1.667,
+    "r_score": 24.174,
+    "avg_score": "--",
+    "yield_rate": 0.882,
+    "zheng_effect": 0.706,
+    "flow_rate": 0.118
   },
   {
     "id": "803",
     "name": "東吳大學",
-    "mu": 32.301,
-    "sigma": 2.327,
-    "r_score": 25.319,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "214",
-    "name": "明志科技大學",
-    "mu": 27.728,
-    "sigma": 0.805,
-    "r_score": 25.313,
-    "avg_score": 49.47
-  },
-  {
-    "id": "816",
-    "name": "銘傳大學",
-    "mu": 27.46,
-    "sigma": 0.841,
-    "r_score": 24.938,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "817",
-    "name": "實踐大學",
-    "mu": 27.29,
-    "sigma": 0.879,
-    "r_score": 24.653,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "808",
-    "name": "靜宜大學",
-    "mu": 27.13,
-    "sigma": 0.859,
-    "r_score": 24.554,
-    "avg_score": "NaN"
+    "mu": 30.092,
+    "sigma": 1.997,
+    "r_score": 24.102,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.7,
+    "flow_rate": 0.0
   },
   {
     "id": "107",
     "name": "國立虎尾科技大學",
-    "mu": 26.474,
-    "sigma": 0.804,
-    "r_score": 24.063,
-    "avg_score": 60.55
+    "mu": 25.841,
+    "sigma": 0.758,
+    "r_score": 23.567,
+    "avg_score": 60.553,
+    "yield_rate": 0.777,
+    "zheng_effect": 0.484,
+    "flow_rate": 0.223
   },
   {
-    "id": "110",
-    "name": "國立勤益科技大學",
-    "mu": 26.226,
-    "sigma": 0.797,
-    "r_score": 23.835,
-    "avg_score": 59.22
+    "id": "214",
+    "name": "明志科技大學",
+    "mu": 25.78,
+    "sigma": 0.759,
+    "r_score": 23.502,
+    "avg_score": 49.471,
+    "yield_rate": 0.804,
+    "zheng_effect": 0.52,
+    "flow_rate": 0.196
   },
   {
-    "id": "237",
-    "name": "長庚學校財團法人長庚科技大學",
-    "mu": 26.309,
-    "sigma": 0.827,
-    "r_score": 23.828,
-    "avg_score": 48.19
+    "id": "816",
+    "name": "銘傳大學",
+    "mu": 25.785,
+    "sigma": 0.766,
+    "r_score": 23.488,
+    "avg_score": "--",
+    "yield_rate": 0.804,
+    "zheng_effect": 0.447,
+    "flow_rate": 0.196
+  },
+  {
+    "id": "808",
+    "name": "靜宜大學",
+    "mu": 25.537,
+    "sigma": 0.764,
+    "r_score": 23.244,
+    "avg_score": "--",
+    "yield_rate": 0.816,
+    "zheng_effect": 0.434,
+    "flow_rate": 0.184
   },
   {
     "id": "809",
     "name": "長庚大學",
-    "mu": 36.803,
-    "sigma": 4.394,
-    "r_score": 23.622,
-    "avg_score": "NaN"
+    "mu": 36.552,
+    "sigma": 4.456,
+    "r_score": 23.184,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.833,
+    "flow_rate": 0.0
   },
   {
-    "id": "103",
-    "name": "國立屏東科技大學",
-    "mu": 25.975,
-    "sigma": 0.801,
-    "r_score": 23.572,
-    "avg_score": 53.01
+    "id": "817",
+    "name": "實踐大學",
+    "mu": 25.537,
+    "sigma": 0.795,
+    "r_score": 23.152,
+    "avg_score": "--",
+    "yield_rate": 0.804,
+    "zheng_effect": 0.652,
+    "flow_rate": 0.196
   },
   {
-    "id": "245",
-    "name": "致理科技大學",
-    "mu": 25.993,
-    "sigma": 0.814,
-    "r_score": 23.552,
-    "avg_score": 50.8
+    "id": "110",
+    "name": "國立勤益科技大學",
+    "mu": 25.184,
+    "sigma": 0.75,
+    "r_score": 22.933,
+    "avg_score": 59.222,
+    "yield_rate": 0.867,
+    "zheng_effect": 0.521,
+    "flow_rate": 0.133
+  },
+  {
+    "id": "237",
+    "name": "長庚學校財團法人長庚科技大學",
+    "mu": 25.216,
+    "sigma": 0.771,
+    "r_score": 22.903,
+    "avg_score": 48.192,
+    "yield_rate": 0.84,
+    "zheng_effect": 0.625,
+    "flow_rate": 0.16
   },
   {
     "id": "738",
     "name": "國立屏東大學",
-    "mu": 25.995,
-    "sigma": 0.816,
-    "r_score": 23.546,
-    "avg_score": 59.16
-  },
-  {
-    "id": "711",
-    "name": "國立中正大學",
-    "mu": 39.121,
-    "sigma": 5.209,
-    "r_score": 23.493,
-    "avg_score": "NaN"
+    "mu": 25.036,
+    "sigma": 0.762,
+    "r_score": 22.751,
+    "avg_score": 59.155,
+    "yield_rate": 0.81,
+    "zheng_effect": 0.367,
+    "flow_rate": 0.19
   },
   {
     "id": "201",
     "name": "朝陽科技大學",
-    "mu": 25.775,
-    "sigma": 0.808,
-    "r_score": 23.353,
-    "avg_score": 50.47
+    "mu": 24.919,
+    "sigma": 0.773,
+    "r_score": 22.6,
+    "avg_score": 50.47,
+    "yield_rate": 0.876,
+    "zheng_effect": 0.676,
+    "flow_rate": 0.124
   },
   {
-    "id": "241",
-    "name": "文藻外語大學",
-    "mu": 25.485,
-    "sigma": 0.824,
-    "r_score": 23.014,
-    "avg_score": 41.17
+    "id": "245",
+    "name": "致理科技大學",
+    "mu": 24.869,
+    "sigma": 0.767,
+    "r_score": 22.569,
+    "avg_score": 50.805,
+    "yield_rate": 0.922,
+    "zheng_effect": 0.716,
+    "flow_rate": 0.078
   },
   {
-    "id": "828",
-    "name": "亞洲大學",
-    "mu": 25.295,
-    "sigma": 0.808,
-    "r_score": 22.872,
-    "avg_score": "NaN"
+    "id": "103",
+    "name": "國立屏東科技大學",
+    "mu": 24.849,
+    "sigma": 0.762,
+    "r_score": 22.563,
+    "avg_score": 53.01,
+    "yield_rate": 0.745,
+    "zheng_effect": 0.57,
+    "flow_rate": 0.255
   },
   {
     "id": "801",
     "name": "東海大學",
-    "mu": 29.285,
-    "sigma": 2.163,
-    "r_score": 22.795,
-    "avg_score": "NaN"
+    "mu": 26.847,
+    "sigma": 1.551,
+    "r_score": 22.193,
+    "avg_score": "--",
+    "yield_rate": 0.867,
+    "zheng_effect": 0.6,
+    "flow_rate": 0.133
   },
   {
-    "id": "209",
-    "name": "弘光科技大學",
-    "mu": 23.984,
-    "sigma": 0.811,
-    "r_score": 21.552,
-    "avg_score": 40.94
+    "id": "241",
+    "name": "文藻外語大學",
+    "mu": 24.291,
+    "sigma": 0.758,
+    "r_score": 22.016,
+    "avg_score": 41.167,
+    "yield_rate": 0.701,
+    "zheng_effect": 0.563,
+    "flow_rate": 0.299
   },
   {
-    "id": "702",
-    "name": "國立清華大學",
-    "mu": 37.293,
-    "sigma": 5.41,
-    "r_score": 21.062,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "802",
-    "name": "輔仁大學",
-    "mu": 30.346,
-    "sigma": 3.118,
-    "r_score": 20.992,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "206",
-    "name": "龍華科技大學",
-    "mu": 23.099,
-    "sigma": 0.822,
-    "r_score": 20.633,
-    "avg_score": 30.24
-  },
-  {
-    "id": "731",
-    "name": "國立體育大學",
-    "mu": 30.747,
-    "sigma": 3.526,
-    "r_score": 20.168,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "227",
-    "name": "德明財經科技大學",
-    "mu": 22.515,
-    "sigma": 0.829,
-    "r_score": 20.029,
-    "avg_score": 35.43
-  },
-  {
-    "id": "221",
-    "name": "台南應用科技大學",
-    "mu": 22.383,
-    "sigma": 0.798,
-    "r_score": 19.988,
-    "avg_score": 35.75
-  },
-  {
-    "id": "202",
-    "name": "南臺科技大學",
-    "mu": 22.386,
-    "sigma": 0.805,
-    "r_score": 19.971,
-    "avg_score": 35.21
-  },
-  {
-    "id": "250",
-    "name": "亞東科技大學",
-    "mu": 22.43,
-    "sigma": 0.823,
-    "r_score": 19.962,
-    "avg_score": 33.99
-  },
-  {
-    "id": "724",
-    "name": "國立聯合大學",
-    "mu": 22.432,
-    "sigma": 0.884,
-    "r_score": 19.779,
-    "avg_score": 47.04
+    "id": "828",
+    "name": "亞洲大學",
+    "mu": 24.316,
+    "sigma": 0.772,
+    "r_score": 21.999,
+    "avg_score": "--",
+    "yield_rate": 0.716,
+    "zheng_effect": 0.594,
+    "flow_rate": 0.284
   },
   {
     "id": "716",
     "name": "國立嘉義大學",
-    "mu": 27.667,
-    "sigma": 2.786,
-    "r_score": 19.308,
-    "avg_score": "NaN"
+    "mu": 27.129,
+    "sigma": 1.752,
+    "r_score": 21.872,
+    "avg_score": "--",
+    "yield_rate": 0.857,
+    "zheng_effect": 0.143,
+    "flow_rate": 0.143
   },
   {
-    "id": "109",
-    "name": "國立澎湖科技大學",
-    "mu": 21.622,
-    "sigma": 0.843,
-    "r_score": 19.094,
-    "avg_score": 37.97
+    "id": "209",
+    "name": "弘光科技大學",
+    "mu": 23.468,
+    "sigma": 0.761,
+    "r_score": 21.184,
+    "avg_score": 40.942,
+    "yield_rate": 0.724,
+    "zheng_effect": 0.603,
+    "flow_rate": 0.276
   },
   {
-    "id": "733",
-    "name": "國立臺灣體育運動大學",
-    "mu": 29.444,
-    "sigma": 3.46,
-    "r_score": 19.064,
-    "avg_score": "NaN"
+    "id": "702",
+    "name": "國立清華大學",
+    "mu": 37.055,
+    "sigma": 5.313,
+    "r_score": 21.117,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 1.0,
+    "flow_rate": 0.0
   },
   {
-    "id": "732",
-    "name": "國立金門大學",
-    "mu": 22.835,
-    "sigma": 1.387,
-    "r_score": 18.675,
-    "avg_score": 44.16
+    "id": "206",
+    "name": "龍華科技大學",
+    "mu": 23.359,
+    "sigma": 0.773,
+    "r_score": 21.042,
+    "avg_score": 30.239,
+    "yield_rate": 0.713,
+    "zheng_effect": 0.67,
+    "flow_rate": 0.287
   },
   {
-    "id": "220",
-    "name": "中臺科技大學",
-    "mu": 20.804,
-    "sigma": 0.82,
-    "r_score": 18.344,
-    "avg_score": 36.03
+    "id": "724",
+    "name": "國立聯合大學",
+    "mu": 23.123,
+    "sigma": 0.769,
+    "r_score": 20.817,
+    "avg_score": 47.039,
+    "yield_rate": 0.571,
+    "zheng_effect": 0.379,
+    "flow_rate": 0.429
   },
   {
     "id": "723",
     "name": "國立宜蘭大學",
-    "mu": 22.811,
-    "sigma": 1.522,
-    "r_score": 18.243,
-    "avg_score": 54.63
+    "mu": 23.787,
+    "sigma": 1.114,
+    "r_score": 20.444,
+    "avg_score": 54.634,
+    "yield_rate": 0.5,
+    "zheng_effect": 0.25,
+    "flow_rate": 0.5
+  },
+  {
+    "id": "221",
+    "name": "台南應用科技大學",
+    "mu": 22.686,
+    "sigma": 0.767,
+    "r_score": 20.386,
+    "avg_score": 35.746,
+    "yield_rate": 0.715,
+    "zheng_effect": 0.642,
+    "flow_rate": 0.285
+  },
+  {
+    "id": "109",
+    "name": "國立澎湖科技大學",
+    "mu": 22.592,
+    "sigma": 0.759,
+    "r_score": 20.314,
+    "avg_score": 37.972,
+    "yield_rate": 0.519,
+    "zheng_effect": 0.489,
+    "flow_rate": 0.481
+  },
+  {
+    "id": "202",
+    "name": "南臺科技大學",
+    "mu": 22.506,
+    "sigma": 0.749,
+    "r_score": 20.26,
+    "avg_score": 35.211,
+    "yield_rate": 0.653,
+    "zheng_effect": 0.537,
+    "flow_rate": 0.347
+  },
+  {
+    "id": "227",
+    "name": "德明財經科技大學",
+    "mu": 22.458,
+    "sigma": 0.759,
+    "r_score": 20.18,
+    "avg_score": 35.428,
+    "yield_rate": 0.555,
+    "zheng_effect": 0.539,
+    "flow_rate": 0.445
+  },
+  {
+    "id": "802",
+    "name": "輔仁大學",
+    "mu": 28.205,
+    "sigma": 2.74,
+    "r_score": 19.984,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.778,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "250",
+    "name": "亞東科技大學",
+    "mu": 22.147,
+    "sigma": 0.753,
+    "r_score": 19.887,
+    "avg_score": 33.99,
+    "yield_rate": 0.671,
+    "zheng_effect": 0.606,
+    "flow_rate": 0.329
+  },
+  {
+    "id": "732",
+    "name": "國立金門大學",
+    "mu": 22.818,
+    "sigma": 0.997,
+    "r_score": 19.828,
+    "avg_score": 44.161,
+    "yield_rate": 0.535,
+    "zheng_effect": 0.256,
+    "flow_rate": 0.465
+  },
+  {
+    "id": "220",
+    "name": "中臺科技大學",
+    "mu": 21.991,
+    "sigma": 0.759,
+    "r_score": 19.714,
+    "avg_score": 36.03,
+    "yield_rate": 0.627,
+    "zheng_effect": 0.596,
+    "flow_rate": 0.373
+  },
+  {
+    "id": "731",
+    "name": "國立體育大學",
+    "mu": 28.49,
+    "sigma": 3.007,
+    "r_score": 19.47,
+    "avg_score": "--",
+    "yield_rate": 0.75,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.25
   },
   {
     "id": "718",
     "name": "國立東華大學",
-    "mu": 27.512,
-    "sigma": 3.151,
-    "r_score": 18.06,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "204",
-    "name": "嘉藥學校財團法人嘉南藥理大學",
-    "mu": 20.193,
-    "sigma": 0.793,
-    "r_score": 17.813,
-    "avg_score": 38.43
-  },
-  {
-    "id": "218",
-    "name": "嶺東科技大學",
-    "mu": 20.155,
-    "sigma": 0.817,
-    "r_score": 17.706,
-    "avg_score": 31.95
-  },
-  {
-    "id": "722",
-    "name": "國立臺東大學",
-    "mu": 27.641,
-    "sigma": 3.418,
-    "r_score": 17.387,
-    "avg_score": "NaN"
+    "mu": 26.771,
+    "sigma": 2.445,
+    "r_score": 19.436,
+    "avg_score": "--",
+    "yield_rate": 0.7,
+    "zheng_effect": 0.3,
+    "flow_rate": 0.3
   },
   {
     "id": "207",
     "name": "輔英科技大學",
-    "mu": 20.38,
-    "sigma": 1.019,
-    "r_score": 17.322,
-    "avg_score": 35.39
+    "mu": 21.723,
+    "sigma": 0.795,
+    "r_score": 19.337,
+    "avg_score": 35.386,
+    "yield_rate": 0.637,
+    "zheng_effect": 0.575,
+    "flow_rate": 0.363
   },
   {
-    "id": "705",
-    "name": "國立成功大學",
-    "mu": 34.507,
-    "sigma": 5.788,
-    "r_score": 17.144,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "208",
-    "name": "明新科技大學",
-    "mu": 19.561,
-    "sigma": 0.851,
-    "r_score": 17.008,
-    "avg_score": 32.35
-  },
-  {
-    "id": "239",
-    "name": "臺北城市科技大學",
-    "mu": 19.283,
-    "sigma": 0.869,
-    "r_score": 16.675,
-    "avg_score": 30.76
-  },
-  {
-    "id": "725",
-    "name": "國立臺南藝術大學",
-    "mu": 28.217,
-    "sigma": 3.855,
-    "r_score": 16.652,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "821",
-    "name": "大同大學",
-    "mu": 26.956,
-    "sigma": 3.449,
-    "r_score": 16.61,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "826",
-    "name": "中國醫藥大學",
-    "mu": 29.05,
-    "sigma": 4.174,
-    "r_score": 16.528,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "230",
-    "name": "僑光科技大學",
-    "mu": 18.67,
-    "sigma": 0.844,
-    "r_score": 16.138,
-    "avg_score": 32.57
-  },
-  {
-    "id": "203",
-    "name": "崑山科技大學",
-    "mu": 18.48,
-    "sigma": 0.818,
-    "r_score": 16.025,
-    "avg_score": 32.96
-  },
-  {
-    "id": "205",
-    "name": "樹德科技大學",
-    "mu": 18.479,
-    "sigma": 0.833,
-    "r_score": 15.982,
-    "avg_score": 36.53
-  },
-  {
-    "id": "822",
-    "name": "慈濟學校財團法人慈濟大學",
-    "mu": 27.516,
-    "sigma": 3.846,
-    "r_score": 15.979,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "726",
-    "name": "國立臺南大學",
-    "mu": 28.273,
-    "sigma": 4.205,
-    "r_score": 15.657,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "701",
-    "name": "國立政治大學",
-    "mu": 33.35,
-    "sigma": 5.917,
-    "r_score": 15.601,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "825",
-    "name": "長榮大學",
-    "mu": 21.814,
-    "sigma": 2.161,
-    "r_score": 15.33,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "819",
-    "name": "南華大學",
-    "mu": 21.916,
-    "sigma": 2.214,
-    "r_score": 15.273,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "812",
-    "name": "大葉大學",
-    "mu": 21.249,
-    "sigma": 2.002,
-    "r_score": 15.244,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "211",
-    "name": "正修科技大學",
-    "mu": 17.684,
-    "sigma": 0.834,
-    "r_score": 15.181,
-    "avg_score": 30.94
-  },
-  {
-    "id": "814",
-    "name": "義守大學",
-    "mu": 19.61,
-    "sigma": 1.668,
-    "r_score": 14.605,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "224",
-    "name": "景文科技大學",
-    "mu": 17.186,
-    "sigma": 0.885,
-    "r_score": 14.532,
-    "avg_score": 34.42
-  },
-  {
-    "id": "210",
-    "name": "健行科技大學",
-    "mu": 17.114,
-    "sigma": 0.894,
-    "r_score": 14.432,
-    "avg_score": 31.9
-  },
-  {
-    "id": "249",
-    "name": "台北海洋科技大學",
-    "mu": 17.395,
-    "sigma": 1.247,
-    "r_score": 13.652,
-    "avg_score": 38.73
-  },
-  {
-    "id": "212",
-    "name": "萬能科技大學",
-    "mu": 16.661,
-    "sigma": 1.007,
-    "r_score": 13.642,
-    "avg_score": 31.09
+    "id": "733",
+    "name": "國立臺灣體育運動大學",
+    "mu": 27.078,
+    "sigma": 2.647,
+    "r_score": 19.137,
+    "avg_score": "--",
+    "yield_rate": 0.8,
+    "zheng_effect": 0.6,
+    "flow_rate": 0.2
   },
   {
     "id": "806",
     "name": "中國文化大學",
-    "mu": 25.14,
-    "sigma": 3.867,
-    "r_score": 13.539,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "244",
-    "name": "慈濟學校財團法人慈濟科技大學",
-    "mu": 18.198,
-    "sigma": 1.562,
-    "r_score": 13.513,
-    "avg_score": 39.29
-  },
-  {
-    "id": "719",
-    "name": "國立暨南國際大學",
-    "mu": 25.002,
-    "sigma": 3.877,
-    "r_score": 13.372,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "233",
-    "name": "吳鳳科技大學",
-    "mu": 18.01,
-    "sigma": 1.571,
-    "r_score": 13.297,
-    "avg_score": 32.2
-  },
-  {
-    "id": "827",
-    "name": "玄奘大學",
-    "mu": 31.483,
-    "sigma": 6.157,
-    "r_score": 13.013,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "411",
-    "name": "南亞技術學院",
-    "mu": 19.294,
-    "sigma": 2.243,
-    "r_score": 12.567,
-    "avg_score": 32.98
+    "mu": 25.049,
+    "sigma": 1.972,
+    "r_score": 19.134,
+    "avg_score": "--",
+    "yield_rate": 0.333,
+    "zheng_effect": 0.167,
+    "flow_rate": 0.667
   },
   {
     "id": "721",
     "name": "國立臺灣藝術大學",
-    "mu": 27.94,
-    "sigma": 5.165,
-    "r_score": 12.447,
-    "avg_score": "NaN"
+    "mu": 30.21,
+    "sigma": 3.714,
+    "r_score": 19.067,
+    "avg_score": "--",
+    "yield_rate": 0.333,
+    "zheng_effect": 0.333,
+    "flow_rate": 0.667
   },
   {
-    "id": "213",
-    "name": "建國科技大學",
-    "mu": 16.754,
-    "sigma": 1.438,
-    "r_score": 12.441,
-    "avg_score": 32.0
+    "id": "208",
+    "name": "明新科技大學",
+    "mu": 21.307,
+    "sigma": 0.75,
+    "r_score": 19.057,
+    "avg_score": 32.35,
+    "yield_rate": 0.613,
+    "zheng_effect": 0.584,
+    "flow_rate": 0.387
   },
   {
-    "id": "830",
-    "name": "佛光大學",
-    "mu": 19.264,
-    "sigma": 2.33,
-    "r_score": 12.274,
-    "avg_score": "NaN"
+    "id": "204",
+    "name": "嘉藥學校財團法人嘉南藥理大學",
+    "mu": 21.334,
+    "sigma": 0.768,
+    "r_score": 19.03,
+    "avg_score": 38.425,
+    "yield_rate": 0.657,
+    "zheng_effect": 0.579,
+    "flow_rate": 0.343
   },
   {
-    "id": "240",
-    "name": "醒吾科技大學",
-    "mu": 14.846,
-    "sigma": 0.917,
-    "r_score": 12.095,
-    "avg_score": 31.99
+    "id": "726",
+    "name": "國立臺南大學",
+    "mu": 27.799,
+    "sigma": 2.937,
+    "r_score": 18.987,
+    "avg_score": "--",
+    "yield_rate": 0.75,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.25
+  },
+  {
+    "id": "821",
+    "name": "大同大學",
+    "mu": 26.22,
+    "sigma": 2.415,
+    "r_score": 18.975,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "711",
+    "name": "國立中正大學",
+    "mu": 34.161,
+    "sigma": 5.095,
+    "r_score": 18.878,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.75,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "218",
+    "name": "嶺東科技大學",
+    "mu": 21.146,
+    "sigma": 0.758,
+    "r_score": 18.871,
+    "avg_score": 31.946,
+    "yield_rate": 0.695,
+    "zheng_effect": 0.665,
+    "flow_rate": 0.305
+  },
+  {
+    "id": "819",
+    "name": "南華大學",
+    "mu": 23.06,
+    "sigma": 1.501,
+    "r_score": 18.558,
+    "avg_score": "--",
+    "yield_rate": 0.759,
+    "zheng_effect": 0.69,
+    "flow_rate": 0.241
+  },
+  {
+    "id": "719",
+    "name": "國立暨南國際大學",
+    "mu": 25.154,
+    "sigma": 2.199,
+    "r_score": 18.557,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "239",
+    "name": "臺北城市科技大學",
+    "mu": 20.776,
+    "sigma": 0.756,
+    "r_score": 18.509,
+    "avg_score": 30.756,
+    "yield_rate": 0.828,
+    "zheng_effect": 0.822,
+    "flow_rate": 0.172
+  },
+  {
+    "id": "822",
+    "name": "慈濟學校財團法人慈濟大學",
+    "mu": 25.458,
+    "sigma": 2.317,
+    "r_score": 18.508,
+    "avg_score": "--",
+    "yield_rate": 0.75,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.25
+  },
+  {
+    "id": "814",
+    "name": "義守大學",
+    "mu": 21.57,
+    "sigma": 1.022,
+    "r_score": 18.503,
+    "avg_score": "--",
+    "yield_rate": 0.591,
+    "zheng_effect": 0.432,
+    "flow_rate": 0.409
+  },
+  {
+    "id": "244",
+    "name": "慈濟學校財團法人慈濟科技大學",
+    "mu": 21.131,
+    "sigma": 0.981,
+    "r_score": 18.188,
+    "avg_score": 39.292,
+    "yield_rate": 0.562,
+    "zheng_effect": 0.562,
+    "flow_rate": 0.438
+  },
+  {
+    "id": "203",
+    "name": "崑山科技大學",
+    "mu": 20.403,
+    "sigma": 0.753,
+    "r_score": 18.143,
+    "avg_score": 32.955,
+    "yield_rate": 0.59,
+    "zheng_effect": 0.565,
+    "flow_rate": 0.41
+  },
+  {
+    "id": "825",
+    "name": "長榮大學",
+    "mu": 22.557,
+    "sigma": 1.49,
+    "r_score": 18.086,
+    "avg_score": "--",
+    "yield_rate": 0.375,
+    "zheng_effect": 0.312,
+    "flow_rate": 0.625
+  },
+  {
+    "id": "230",
+    "name": "僑光科技大學",
+    "mu": 20.283,
+    "sigma": 0.777,
+    "r_score": 17.951,
+    "avg_score": 32.573,
+    "yield_rate": 0.764,
+    "zheng_effect": 0.73,
+    "flow_rate": 0.236
+  },
+  {
+    "id": "205",
+    "name": "樹德科技大學",
+    "mu": 20.226,
+    "sigma": 0.765,
+    "r_score": 17.93,
+    "avg_score": 36.526,
+    "yield_rate": 0.754,
+    "zheng_effect": 0.733,
+    "flow_rate": 0.246
+  },
+  {
+    "id": "211",
+    "name": "正修科技大學",
+    "mu": 20.096,
+    "sigma": 0.757,
+    "r_score": 17.825,
+    "avg_score": 30.936,
+    "yield_rate": 0.712,
+    "zheng_effect": 0.624,
+    "flow_rate": 0.288
+  },
+  {
+    "id": "210",
+    "name": "健行科技大學",
+    "mu": 19.822,
+    "sigma": 0.758,
+    "r_score": 17.549,
+    "avg_score": 31.901,
+    "yield_rate": 0.758,
+    "zheng_effect": 0.75,
+    "flow_rate": 0.242
+  },
+  {
+    "id": "812",
+    "name": "大葉大學",
+    "mu": 21.499,
+    "sigma": 1.399,
+    "r_score": 17.302,
+    "avg_score": "--",
+    "yield_rate": 0.561,
+    "zheng_effect": 0.561,
+    "flow_rate": 0.439
+  },
+  {
+    "id": "224",
+    "name": "景文科技大學",
+    "mu": 19.594,
+    "sigma": 0.765,
+    "r_score": 17.298,
+    "avg_score": 34.421,
+    "yield_rate": 0.683,
+    "zheng_effect": 0.654,
+    "flow_rate": 0.317
   },
   {
     "id": "503",
     "name": "國立臺東專科學校",
-    "mu": 15.848,
-    "sigma": 1.344,
-    "r_score": 11.817,
-    "avg_score": 31.08
+    "mu": 19.48,
+    "sigma": 0.883,
+    "r_score": 16.832,
+    "avg_score": 31.081,
+    "yield_rate": 0.496,
+    "zheng_effect": 0.456,
+    "flow_rate": 0.504
   },
   {
     "id": "248",
     "name": "崇右影藝科技大學",
-    "mu": 19.436,
-    "sigma": 2.702,
-    "r_score": 11.33,
-    "avg_score": 27.73
+    "mu": 21.747,
+    "sigma": 1.639,
+    "r_score": 16.831,
+    "avg_score": 27.729,
+    "yield_rate": 0.929,
+    "zheng_effect": 0.903,
+    "flow_rate": 0.071
   },
   {
-    "id": "216",
-    "name": "大仁科技大學",
-    "mu": 16.994,
-    "sigma": 1.921,
-    "r_score": 11.229,
-    "avg_score": 40.76
+    "id": "212",
+    "name": "萬能科技大學",
+    "mu": 19.21,
+    "sigma": 0.819,
+    "r_score": 16.753,
+    "avg_score": 31.086,
+    "yield_rate": 0.868,
+    "zheng_effect": 0.862,
+    "flow_rate": 0.132
   },
   {
-    "id": "415",
-    "name": "黎明技術學院",
-    "mu": 14.049,
-    "sigma": 1.596,
-    "r_score": 9.261,
-    "avg_score": 28.83
+    "id": "722",
+    "name": "國立臺東大學",
+    "mu": 25.565,
+    "sigma": 2.938,
+    "r_score": 16.75,
+    "avg_score": "--",
+    "yield_rate": 0.833,
+    "zheng_effect": 0.667,
+    "flow_rate": 0.167
   },
   {
-    "id": "811",
-    "name": "中華大學",
-    "mu": 23.211,
-    "sigma": 4.977,
-    "r_score": 8.28,
-    "avg_score": "NaN"
+    "id": "240",
+    "name": "醒吾科技大學",
+    "mu": 18.889,
+    "sigma": 0.76,
+    "r_score": 16.609,
+    "avg_score": 31.992,
+    "yield_rate": 0.641,
+    "zheng_effect": 0.586,
+    "flow_rate": 0.359
   },
   {
-    "id": "417",
-    "name": "德育學校財團法人德育護理健康學院",
-    "mu": 17.21,
-    "sigma": 2.984,
-    "r_score": 8.257,
-    "avg_score": 38.1
-  },
-  {
-    "id": "820",
-    "name": "真理大學",
-    "mu": 14.737,
-    "sigma": 2.369,
-    "r_score": 7.628,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "231",
-    "name": "育達科技大學",
-    "mu": 12.471,
-    "sigma": 1.856,
-    "r_score": 6.903,
-    "avg_score": 27.4
-  },
-  {
-    "id": "810",
-    "name": "元智大學",
-    "mu": 20.054,
-    "sigma": 4.447,
-    "r_score": 6.711,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "246",
-    "name": "宏國德霖科技大學",
-    "mu": 12.086,
-    "sigma": 2.488,
-    "r_score": 4.622,
-    "avg_score": 27.99
-  },
-  {
-    "id": "238",
-    "name": "敏實科技大學",
-    "mu": 15.684,
-    "sigma": 3.751,
-    "r_score": 4.432,
-    "avg_score": 29.91
-  },
-  {
-    "id": "236",
-    "name": "修平科技大學",
-    "mu": 9.195,
-    "sigma": 1.89,
-    "r_score": 3.527,
-    "avg_score": 34.49
-  },
-  {
-    "id": "717",
-    "name": "國立高雄大學",
-    "mu": 22.458,
-    "sigma": 7.035,
-    "r_score": 1.354,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "715",
-    "name": "國立臺北大學",
-    "mu": 22.688,
-    "sigma": 7.138,
-    "r_score": 1.275,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "818",
-    "name": "高雄醫學大學",
-    "mu": 22.135,
-    "sigma": 7.014,
-    "r_score": 1.093,
-    "avg_score": "NaN"
-  },
-  {
-    "id": "703",
-    "name": "國立臺灣大學",
-    "mu": 20.593,
-    "sigma": 6.551,
-    "r_score": 0.942,
-    "avg_score": "NaN"
+    "id": "249",
+    "name": "台北海洋科技大學",
+    "mu": 19.363,
+    "sigma": 0.928,
+    "r_score": 16.579,
+    "avg_score": 38.725,
+    "yield_rate": 0.581,
+    "zheng_effect": 0.537,
+    "flow_rate": 0.419
   },
   {
     "id": "727",
     "name": "國立臺北教育大學",
-    "mu": 20.456,
-    "sigma": 6.625,
-    "r_score": 0.58,
-    "avg_score": "NaN"
+    "mu": 27.132,
+    "sigma": 3.594,
+    "r_score": 16.35,
+    "avg_score": "--",
+    "yield_rate": 0.0,
+    "zheng_effect": 0.0,
+    "flow_rate": 1.0
   },
   {
-    "id": "217",
-    "name": "聖約翰科技大學",
-    "mu": 16.079,
-    "sigma": 5.296,
-    "r_score": 0.191,
-    "avg_score": 37.66
+    "id": "216",
+    "name": "大仁科技大學",
+    "mu": 19.874,
+    "sigma": 1.226,
+    "r_score": 16.196,
+    "avg_score": 40.759,
+    "yield_rate": 0.831,
+    "zheng_effect": 0.788,
+    "flow_rate": 0.169
+  },
+  {
+    "id": "830",
+    "name": "佛光大學",
+    "mu": 20.716,
+    "sigma": 1.522,
+    "r_score": 16.15,
+    "avg_score": "--",
+    "yield_rate": 0.68,
+    "zheng_effect": 0.6,
+    "flow_rate": 0.32
+  },
+  {
+    "id": "233",
+    "name": "吳鳳科技大學",
+    "mu": 19.661,
+    "sigma": 1.199,
+    "r_score": 16.065,
+    "avg_score": 32.196,
+    "yield_rate": 0.843,
+    "zheng_effect": 0.795,
+    "flow_rate": 0.157
+  },
+  {
+    "id": "213",
+    "name": "建國科技大學",
+    "mu": 19.001,
+    "sigma": 1.089,
+    "r_score": 15.732,
+    "avg_score": 32.001,
+    "yield_rate": 0.662,
+    "zheng_effect": 0.617,
+    "flow_rate": 0.338
+  },
+  {
+    "id": "411",
+    "name": "南亞技術學院",
+    "mu": 20.953,
+    "sigma": 1.757,
+    "r_score": 15.681,
+    "avg_score": 32.981,
+    "yield_rate": 0.907,
+    "zheng_effect": 0.888,
+    "flow_rate": 0.093
+  },
+  {
+    "id": "705",
+    "name": "國立成功大學",
+    "mu": 33.119,
+    "sigma": 5.936,
+    "r_score": 15.312,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 1.0,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "725",
+    "name": "國立臺南藝術大學",
+    "mu": 26.726,
+    "sigma": 3.827,
+    "r_score": 15.244,
+    "avg_score": "--",
+    "yield_rate": 0.8,
+    "zheng_effect": 0.6,
+    "flow_rate": 0.2
+  },
+  {
+    "id": "415",
+    "name": "黎明技術學院",
+    "mu": 18.225,
+    "sigma": 1.044,
+    "r_score": 15.092,
+    "avg_score": 28.833,
+    "yield_rate": 0.724,
+    "zheng_effect": 0.708,
+    "flow_rate": 0.276
+  },
+  {
+    "id": "826",
+    "name": "中國醫藥大學",
+    "mu": 27.795,
+    "sigma": 4.242,
+    "r_score": 15.068,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.0,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "246",
+    "name": "宏國德霖科技大學",
+    "mu": 18.507,
+    "sigma": 1.264,
+    "r_score": 14.714,
+    "avg_score": 27.99,
+    "yield_rate": 0.53,
+    "zheng_effect": 0.53,
+    "flow_rate": 0.47
+  },
+  {
+    "id": "231",
+    "name": "育達科技大學",
+    "mu": 17.952,
+    "sigma": 1.128,
+    "r_score": 14.568,
+    "avg_score": 27.404,
+    "yield_rate": 0.674,
+    "zheng_effect": 0.64,
+    "flow_rate": 0.326
+  },
+  {
+    "id": "701",
+    "name": "國立政治大學",
+    "mu": 32.339,
+    "sigma": 6.035,
+    "r_score": 14.232,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 1.0,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "820",
+    "name": "真理大學",
+    "mu": 18.461,
+    "sigma": 1.48,
+    "r_score": 14.021,
+    "avg_score": "--",
+    "yield_rate": 0.28,
+    "zheng_effect": 0.24,
+    "flow_rate": 0.72
+  },
+  {
+    "id": "236",
+    "name": "修平科技大學",
+    "mu": 16.739,
+    "sigma": 1.025,
+    "r_score": 13.664,
+    "avg_score": 34.493,
+    "yield_rate": 0.629,
+    "zheng_effect": 0.606,
+    "flow_rate": 0.371
+  },
+  {
+    "id": "827",
+    "name": "玄奘大學",
+    "mu": 30.543,
+    "sigma": 5.93,
+    "r_score": 12.754,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 1.0,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "238",
+    "name": "敏實科技大學",
+    "mu": 19.693,
+    "sigma": 2.478,
+    "r_score": 12.259,
+    "avg_score": 29.914,
+    "yield_rate": 0.75,
+    "zheng_effect": 0.75,
+    "flow_rate": 0.25
+  },
+  {
+    "id": "717",
+    "name": "國立高雄大學",
+    "mu": 25.396,
+    "sigma": 4.472,
+    "r_score": 11.979,
+    "avg_score": "--",
+    "yield_rate": 1.0,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.0
+  },
+  {
+    "id": "811",
+    "name": "中華大學",
+    "mu": 21.13,
+    "sigma": 3.109,
+    "r_score": 11.803,
+    "avg_score": "--",
+    "yield_rate": 0.4,
+    "zheng_effect": 0.4,
+    "flow_rate": 0.6
+  },
+  {
+    "id": "417",
+    "name": "德育學校財團法人德育護理健康學院",
+    "mu": 18.983,
+    "sigma": 2.599,
+    "r_score": 11.187,
+    "avg_score": 38.1,
+    "yield_rate": 0.64,
+    "zheng_effect": 0.6,
+    "flow_rate": 0.36
+  },
+  {
+    "id": "715",
+    "name": "國立臺北大學",
+    "mu": 24.11,
+    "sigma": 4.509,
+    "r_score": 10.582,
+    "avg_score": "--",
+    "yield_rate": 0.0,
+    "zheng_effect": 0.0,
+    "flow_rate": 1.0
+  },
+  {
+    "id": "818",
+    "name": "高雄醫學大學",
+    "mu": 23.938,
+    "sigma": 4.517,
+    "r_score": 10.387,
+    "avg_score": "--",
+    "yield_rate": 0.75,
+    "zheng_effect": 0.75,
+    "flow_rate": 0.25
+  },
+  {
+    "id": "810",
+    "name": "元智大學",
+    "mu": 20.682,
+    "sigma": 3.524,
+    "r_score": 10.111,
+    "avg_score": "--",
+    "yield_rate": 0.667,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.333
   },
   {
     "id": "502",
     "name": "國立臺南護理專科學校",
-    "mu": 16.773,
-    "sigma": 5.924,
-    "r_score": -0.998,
-    "avg_score": 42.35
+    "mu": 19.122,
+    "sigma": 4.223,
+    "r_score": 6.452,
+    "avg_score": 42.35,
+    "yield_rate": 0.9,
+    "zheng_effect": 0.9,
+    "flow_rate": 0.1
+  },
+  {
+    "id": "703",
+    "name": "國立臺灣大學",
+    "mu": 19.991,
+    "sigma": 6.42,
+    "r_score": 0.729,
+    "avg_score": "--",
+    "yield_rate": 0.5,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.5
+  },
+  {
+    "id": "217",
+    "name": "聖約翰科技大學",
+    "mu": 16.05,
+    "sigma": 5.23,
+    "r_score": 0.361,
+    "avg_score": 37.659,
+    "yield_rate": 0.5,
+    "zheng_effect": 0.5,
+    "flow_rate": 0.5
   }
 ]
