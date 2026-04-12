@@ -38,7 +38,7 @@ function App() {
   useEffect(() => {
     if (!selectedYear || !selectedDimension) return;
 
-    setSearchTerm('');
+    // setSearchTerm('');
     setSortConfig({ key: null, direction: 'descending' });
 
     Promise.all([
@@ -114,7 +114,36 @@ function App() {
   const displayRankings = useMemo(() => {
     let processedData = rankings
       .map((dept, index) => ({ ...dept, originalRank: index + 1 }))
-      .filter(dept => dept.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      .filter(dept => {
+        if (!searchTerm) return true; // 如果沒有輸入搜尋詞，就全部顯示
+
+        // 1. 清理原始資料的換行符號
+        const cleanDeptName = dept.name.replace(/\n/g, ' ').toLowerCase();
+
+        // 2. 將使用者的搜尋詞用空白切割成陣列 (支援多關鍵字，如: "屏科 獸醫")
+        const searchTermsArray = searchTerm.trim().toLowerCase().split(/\s+/);
+
+        // 3. 檢查「每一個」關鍵字是否都有配對成功
+        return searchTermsArray.every(term => {
+          // 先試試看最簡單的直接包含 (精確比對)
+          if (cleanDeptName.includes(term)) return true;
+
+          // 如果直接找不到，就啟動「模糊比對 (Fuzzy Match)」
+          // 邏輯：只要輸入的字有「按順序」出現在字串中，就算成功
+          let textIndex = 0;
+          let termIndex = 0;
+
+          while (textIndex < cleanDeptName.length && termIndex < term.length) {
+            if (cleanDeptName[textIndex] === term[termIndex]) {
+              termIndex++; // 找到一個字了，準備找下一個
+            }
+            textIndex++; // 繼續往下看資料字串
+          }
+
+          // 如果 termIndex 等於搜尋詞的長度，代表搜尋詞的每個字都依序找到了
+          return termIndex === term.length;
+        });
+      });
 
     if (sortConfig.key) {
       processedData.sort((a, b) => {
@@ -148,7 +177,7 @@ function App() {
 
     const connectedEdges = allEdges
       // 如果需要雙向，要改成 edge.from === selectedDept || edge.to === selectedDept
-      .filter(edge => edge.from === selectedDept)
+      .filter(edge => edge.from === selectedDept || edge.to === selectedDept)
       .map(edge => {
         const newEdge = { ...edge };
         delete newEdge.value;
@@ -198,12 +227,12 @@ function App() {
         color: '#bdc3c7',
         smooth: { type: 'continuous' },
         width: 2,
-        arrows: {
-          to: {
-            enabled: true,
-            scaleFactor: 0.8
-          }
-        }
+        // arrows: {
+        //   to: {
+        //     enabled: true,
+        //     scaleFactor: 0.8
+        //   }
+        // }
       },
       physics: {
         enabled: true,
@@ -287,7 +316,6 @@ function App() {
   const renderTrendChart = () => (
     <div className="chart-wrapper">
       <h3>📈 {currentDeptInfo.name.replace(/\n/g, ' ')} 歷年競爭力趨勢</h3>
-      <p className="insight-tip">顧問洞察：若 R-Score 滑落幅度大於錄取分數，代表學生好感度正在流失，為危險領先指標。</p>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={historicalData} margin={{ top: 20, right: 20, left: 20, bottom: 40 }}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -393,9 +421,9 @@ function App() {
       <div className="dashboard-content">
         <div className="leaderboard-section">
           <div className="leaderboard-header-row">
-            <h2>🏆 全台 Top 排行榜</h2>
+            <h2>📊 全台校系競爭力總覽</h2>
             <div className="leaderboard-actions">
-              {sortConfig.key && <button className="clear-sort-btn" onClick={() => setSortConfig({ key: null, direction: 'descending' })} title="恢復預設總榜排序">🔄 清除排序</button>}
+              {sortConfig.key && <button className="clear-sort-btn" onClick={() => setSortConfig({ key: null, direction: 'descending' })} title="恢復預設排序">🔄 清除排序</button>}
               <div className="search-container">
                 <input type="text" className="search-input" placeholder="🔍 搜尋名稱..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 {searchTerm && <button className="clear-search-btn" onClick={() => setSearchTerm('')} title="清除搜尋">✕</button>}
@@ -406,7 +434,7 @@ function App() {
             <table className="ranking-table">
               <thead>
                 <tr>
-                  <th style={{ width: '10%', textAlign: 'center' }}>排名</th>
+                  <th style={{ width: '10%', textAlign: 'center' }}>項次</th>
                   <th style={{ textAlign: 'left' }}>{selectedDimension === 'school' ? '學校' : selectedDimension === 'dept' ? '校系' : '系組'}</th>
                   <th className="sortable-header" style={{ width: '20%', textAlign: 'left' }} onClick={() => requestSort('r_score')}>R-Score{getSortIcon('r_score')}</th>
                   <th className="sortable-header" style={{ width: '20%', textAlign: 'left' }} onClick={() => requestSort('avg_score')}>錄取分數{getSortIcon('avg_score')}</th>
@@ -418,7 +446,6 @@ function App() {
                     <td className="rank-cell" style={{ textAlign: 'center' }}>{index + 1}</td>
                     <td className="dept-name-cell" style={{ textAlign: 'left' }}>
                       {dept.name.replace(/\n/g, ' ')}
-                      {sortConfig.key && <span className="original-rank-badge" title="總榜原始排名">總榜 #{dept.originalRank}</span>}
                     </td>
                     <td className="r-score-cell" style={{ textAlign: 'left' }}>{dept.r_score}</td>
                     <td className="avg-score-cell" style={{ textAlign: 'left' }}>{dept.avg_score}</td>
