@@ -80,7 +80,7 @@ const HealthChart = ({ healthData }) => {
                 })}
             </div>
 
-            <div style={{ width: '100%', height: '450px', overflowY: 'auto', overflowX: 'hidden', paddingRight: '10px' }}>
+            <div style={{ width: '100%', height: '100%', overflowY: 'auto', overflowX: 'hidden', paddingRight: '10px' }}>
                 <ResponsiveContainer width="100%" height={dynamicHeight}>
                     <BarChart layout="vertical" data={sortedData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#f0f0f0" />

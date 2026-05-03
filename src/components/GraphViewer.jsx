@@ -6,6 +6,7 @@ import NetworkChart from './charts/NetworkChart';
 import TrendChart from './charts/TrendChart';
 import HealthChart from './charts/HealthChart';
 import CompetitionTimeline from './charts/CompetitionTimeline';
+import FlowTable from './charts/FlowTable';
 
 const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimension }) => {
     const [activeTab, setActiveTab] = useState('network');
@@ -25,6 +26,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                 { id: 'network', label: '🤝 競爭關係網' },
                 { id: 'trend', label: '📈 歷年趨勢' },
                 { id: 'health', label: '🛡️ 招生效益' },
+                { id: 'timeline', label: '⏳ 競爭時間軸' },
+                { id: 'flow', label: '🔄 流動情報' },
             ].map(tab => (
                 <button
                     key={tab.id}
@@ -77,6 +80,25 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                         {/* 子元件 3：招生效益圖 */}
                         {activeTab === 'health' && (
                             <HealthChart healthData={healthData} />
+                        )}
+
+                        {/* 子元件 4：時間軸圖 */}
+                        {activeTab === 'timeline' && (
+                            <CompetitionTimeline
+                                timelineRankData={timelineRankData}
+                                trendDepts={trendDepts}
+                                selectedDept={selectedDept}
+                                myLabel={myLabel}
+                            />
+                        )}
+
+                        {/* 子元件 5：流動情報圖 */}
+                        {activeTab === 'flow' && (
+                            <FlowTable
+                                graphData={graphData}
+                                selectedDept={selectedDept}
+                                rankings={rankings}
+                            />
                         )}
                     </div>
                 </>
