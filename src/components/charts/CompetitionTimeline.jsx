@@ -15,6 +15,14 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
     }
 
     const timelineNodes = useMemo(() => {
+        // 建立全域名稱對照表 (確保退出的學校，即使今年不在名單裡也能找到它的名字)
+        const allNames = {};
+        timelineRankData.forEach(data => {
+            if (data.names) {
+                Object.assign(allNames, data.names);
+            }
+        });
+
         return timelineRankData.map((data, index) => {
             let joined = [];
             let left = [];
@@ -22,14 +30,20 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
 
             if (index > 0) {
                 const prevData = timelineRankData[index - 1];
-                const prevIds = Object.keys(prevData.ranks);
-                const currIds = Object.keys(data.ranks);
 
-                const newIds = currIds.filter(id => !prevIds.includes(id));
-                const leftIds = prevIds.filter(id => !currIds.includes(id));
+                // 使用真實關聯圖連線的 activeIds 來判斷進出 (如果沒有，回退使用 ranks 鍵值)
+                const prevIds = prevData.activeIds || Object.keys(prevData.ranks);
+                const currIds = data.activeIds || Object.keys(data.ranks);
 
-                joined = newIds.map(id => trendDepts.find(d => d.id === id)?.name || id);
-                left = leftIds.map(id => trendDepts.find(d => d.id === id)?.name || id);
+                // 篩選新增與退出，並確保排除自己本身
+                const newIds = currIds.filter(id => !prevIds.includes(id) && id !== selectedDept);
+                const leftIds = prevIds.filter(id => !currIds.includes(id) && id !== selectedDept);
+
+                // 透過全域對照表找校系名稱
+                const getName = (id) => allNames[id] || trendDepts.find(d => d.id === id)?.name || id;
+
+                joined = newIds.map(getName);
+                left = leftIds.map(getName);
 
                 const prevRank = prevData.ranks[selectedDept];
                 const currRank = data.ranks[selectedDept];
@@ -41,11 +55,11 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
             const sortedCompetitors = Object.entries(data.ranks)
                 .sort((a, b) => a[1] - b[1])
                 .map(([id, rank]) => {
-                    const deptInfo = trendDepts.find(d => d.id === id);
+                    const name = allNames[id] || trendDepts.find(d => d.id === id)?.name || id;
                     return {
                         id,
                         rank,
-                        name: deptInfo ? deptInfo.name : id,
+                        name,
                         isMe: id === selectedDept
                     };
                 });

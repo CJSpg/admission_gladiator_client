@@ -3,12 +3,15 @@ import { useState, useEffect, useMemo } from 'react';
 export const useHistoricalData = (selectedDept, selectedDimension, years, graphData, rankings) => {
     const [historicalData, setHistoricalData] = useState([]);
     const [trendDepts, setTrendDepts] = useState([]);
+    const [timelineRankDataState, setTimelineRankDataState] = useState([]);
 
     // 1. 取得歷年趨勢與對手連動資料
     useEffect(() => {
         if (!selectedDept || !selectedDimension || years.length === 0 || !graphData.nodes.length) return;
 
         const { edges: allEdges, nodes: allNodes } = graphData;
+
+        // 這是「當前選擇年度」的連線，保留給折線圖使用
         const connectedEdges = allEdges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
         const targetIds = new Set([selectedDept]);
         connectedEdges.forEach(e => {
@@ -29,10 +32,14 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
 
         const fetchHistoricalTrend = async () => {
             try {
+                // 同時抓取歷年的「成績單(rankings)」與「關聯圖(graph)」
                 const promises = years.map(year =>
-                    fetch(`${import.meta.env.BASE_URL}rankings_${year}_${selectedDimension}.json`)
-                        .then(res => res.json())
-                        .then(data => ({ year, data }))
+                    Promise.all([
+                        fetch(`${import.meta.env.BASE_URL}rankings_${year}_${selectedDimension}.json`)
+                            .then(res => res.ok ? res.json() : []),
+                        fetch(`${import.meta.env.BASE_URL}graph_${year}_${selectedDimension}.json`)
+                            .then(res => res.ok ? res.json() : null)
+                    ]).then(([rankingData, yearGraphData]) => ({ year, rankingData, yearGraphData }))
                 );
 
                 const results = await Promise.all(promises);
@@ -45,13 +52,13 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
 
                 const normalizeName = (name) => (name || "").replace(/\n/g, '').replace(/\s+/g, '').trim();
 
-                const trendData = results.map(({ year, data }) => {
+                const trendData = results.map(({ year, rankingData }) => {
                     const yearData = { name: `${year}學年` };
 
                     targetIds.forEach(id => {
-                        const currentFullName = targetNamesMap[id];
+                        const currentFullName = targetNamesMap[id] || idToName[id];
                         const normalizedCurrentName = normalizeName(currentFullName);
-                        const deptData = data.find(d => normalizeName(d.name) === normalizedCurrentName);
+                        const deptData = (rankingData || []).find(d => normalizeName(d.name) === normalizedCurrentName);
                         if (deptData) {
                             yearData[`${id}_RScore`] = parseScore(deptData.r_score);
                             yearData[`${id}_AvgScore`] = parseScore(deptData.avg_score);
@@ -63,12 +70,7 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                     return yearData;
                 });
 
-                trendData.sort((a, b) => {
-                    const yearA = parseInt(a.name.replace(/\D/g, ''));
-                    const yearB = parseInt(b.name.replace(/\D/g, ''));
-                    return yearA - yearB;
-                });
-
+                trendData.sort((a, b) => parseInt(a.name.replace(/\D/g, '')) - parseInt(b.name.replace(/\D/g, '')));
                 setHistoricalData(trendData);
 
                 const deptsArr = Array.from(targetIds).map(id => ({ id, name: idToName[id] }));
@@ -79,8 +81,64 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                     const valB = connectedEdges.find(e => e.from === b.id || e.to === b.id)?.value || 0;
                     return valB - valA;
                 });
-
                 setTrendDepts(deptsArr);
+
+                // --- 區塊 B：計算給「競爭時間軸」用的資料 (✨ 真實動態的年度群體) ---
+                const newTimelineData = [];
+
+                results.forEach(({ year, rankingData, yearGraphData }) => {
+                    if (!yearGraphData || !yearGraphData.edges || !yearGraphData.nodes) return;
+
+                    // 1. 找出該年度真實跟 selectedDept 有連線的學校
+                    const yearEdges = yearGraphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
+                    const yearTargetIds = new Set([selectedDept]);
+                    yearEdges.forEach(e => {
+                        yearTargetIds.add(e.from);
+                        yearTargetIds.add(e.to);
+                    });
+
+                    // 2. 準備該年度的名稱對照表
+                    const yearNames = {};
+                    const yearCompetitors = [];
+                    yearGraphData.nodes.forEach(n => {
+                        if (yearTargetIds.has(n.id)) {
+                            const cleanName = n.label.replace(/\n/g, ' ');
+                            yearNames[n.id] = cleanName;
+                            yearCompetitors.push({ id: n.id, name: cleanName });
+                        }
+                    });
+
+                    // 3. 取得這些真實對手在該年度的成績並排序
+                    const rankingThisYear = yearCompetitors.map(dept => {
+                        const normName = normalizeName(dept.name);
+                        const deptData = (rankingData || []).find(d => normalizeName(d.name) === normName);
+                        return {
+                            id: dept.id,
+                            name: dept.name,
+                            score: deptData ? parseScore(deptData.r_score) : null
+                        };
+                    }).filter(d => d.score !== null).sort((a, b) => b.score - a.score);
+
+                    // 4. 建立排名對照表與原始分數
+                    const rankMap = {};
+                    const rawScores = {};
+                    rankingThisYear.forEach((d, index) => {
+                        rankMap[d.id] = index + 1;
+                        rawScores[`${d.id}_RScore`] = d.score;
+                    });
+
+                    newTimelineData.push({
+                        year: `${year}學年`,
+                        ranks: rankMap,
+                        rawScores: rawScores,
+                        names: yearNames, // ✨ 記錄當年度的真實名稱
+                        activeIds: Array.from(yearTargetIds), // ✨ 記錄當年度真實連線的ID，作為退出/加入判斷依據
+                        totalCount: rankingThisYear.length
+                    });
+                });
+
+                newTimelineData.sort((a, b) => parseInt(a.year.replace(/\D/g, '')) - parseInt(b.year.replace(/\D/g, '')));
+                setTimelineRankDataState(newTimelineData);
 
             } catch (error) {
                 console.error("⚠️ 無法取得歷年趨勢資料", error);
@@ -184,37 +242,7 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
         });
     }, [trendDepts, currentDeptInfo, rankings]);
 
-    const timelineRankData = useMemo(() => {
-        if (!historicalData.length || !trendDepts.length) return [];
-
-        return historicalData.map(yearData => {
-            const year = yearData.name;
-
-            // 1. 抓出該年所有有分數的校系，並進行排序
-            const rankingThisYear = trendDepts
-                .map(dept => ({
-                    id: dept.id,
-                    name: dept.name,
-                    // 根據 R-Score 排序 (你也可以之後改成可切換)
-                    score: yearData[`${dept.id}_RScore`]
-                }))
-                .filter(d => d.score !== null) // 只算有出現的學校
-                .sort((a, b) => b.score - a.score);
-
-            // 2. 建立一個「校系 ID -> 排名」的對照表
-            const rankMap = {};
-            rankingThisYear.forEach((d, index) => {
-                rankMap[d.id] = index + 1; // 排名從 1 開始
-            });
-
-            return {
-                year,
-                ranks: rankMap,
-                totalCount: rankingThisYear.length,
-                rawScores: yearData
-            };
-        });
-    }, [historicalData, trendDepts]);
+    const timelineRankData = timelineRankDataState;
 
     return {
         historicalData,
