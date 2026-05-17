@@ -2,11 +2,11 @@ import React, { useMemo } from 'react';
 
 const FlowTable = ({ graphData, selectedDept, rankings }) => {
     // 💡 利用 useMemo 計算流入與流出資料，避免重複運算
-    const { outflow, inflow } = useMemo(() => {
+    const { outflow, inflow, totalOutflow, totalInflow } = useMemo(() => {
         const outMap = {};
         const inMap = {};
 
-        if (!graphData || !graphData.edges) return { outflow: [], inflow: [] };
+        if (!graphData || !graphData.edges) return { outflow: [], inflow: [], totalOutflow: 0, totalInflow: 0 };
 
         graphData.edges.forEach(edge => {
             // 排除自己流向自己 (避免同系內的流動干擾對手判斷)
@@ -40,9 +40,18 @@ const FlowTable = ({ graphData, selectedDept, rankings }) => {
                 .sort((a, b) => b.count - a.count); // 依照人數由多排到少
         };
 
+        const formattedOutflow = formatAndSort(outMap);
+        const formattedInflow = formatAndSort(inMap);
+
+        // 新增：計算總流出與總流入人數
+        const calcTotalOutflow = formattedOutflow.reduce((sum, item) => sum + item.count, 0);
+        const calcTotalInflow = formattedInflow.reduce((sum, item) => sum + item.count, 0);
+
         return {
-            outflow: formatAndSort(outMap),
-            inflow: formatAndSort(inMap)
+            outflow: formattedOutflow,
+            inflow: formattedInflow,
+            totalOutflow: calcTotalOutflow,
+            totalInflow: calcTotalInflow
         };
     }, [graphData, selectedDept, rankings]);
 
@@ -58,9 +67,16 @@ const FlowTable = ({ graphData, selectedDept, rankings }) => {
 
                 {/* 左側：被拉走 (流出) */}
                 <div style={{ flex: 1, minWidth: '300px', backgroundColor: '#fdf2e9', border: '1px solid #fad7a1', borderRadius: '8px', padding: '15px' }}>
-                    <h4 style={{ margin: '0 0 15px 0', color: '#d35400', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '18px' }}>🏃</span> 流失學生
-                    </h4>
+                    {/* 修改：在標題處加上總計人數，並使用 Flex 的 space-between 將其推至右側 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h4 style={{ margin: '0', color: '#d35400', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '18px' }}>🔴</span> 流失學生
+                        </h4>
+                        <span style={{ backgroundColor: '#f5cba7', color: '#a04000', padding: '4px 10px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' }}>
+                            總計 {totalOutflow} 人
+                        </span>
+                    </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto', paddingRight: '5px' }}>
                         {outflow.length === 0 ? (
                             <div style={{ color: '#95a5a6', fontSize: '13px', textAlign: 'center', padding: '20px' }}>無流出紀錄</div>
@@ -80,9 +96,16 @@ const FlowTable = ({ graphData, selectedDept, rankings }) => {
 
                 {/* 右側：拉過來 (流入) */}
                 <div style={{ flex: 1, minWidth: '300px', backgroundColor: '#eafaf1', border: '1px solid #abebc6', borderRadius: '8px', padding: '15px' }}>
-                    <h4 style={{ margin: '0 0 15px 0', color: '#27ae60', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '18px' }}>🧲</span> 吸收學生
-                    </h4>
+                    {/* 修改：在標題處加上總計人數，並使用 Flex 的 space-between 將其推至右側 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h4 style={{ margin: '0', color: '#27ae60', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '18px' }}>🟢</span> 流入學生
+                        </h4>
+                        <span style={{ backgroundColor: '#a9dfbf', color: '#186a3b', padding: '4px 10px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' }}>
+                            總計 {totalInflow} 人
+                        </span>
+                    </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto', paddingRight: '5px' }}>
                         {inflow.length === 0 ? (
                             <div style={{ color: '#95a5a6', fontSize: '13px', textAlign: 'center', padding: '20px' }}>無流入紀錄</div>

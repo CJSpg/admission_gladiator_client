@@ -1,10 +1,14 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Network } from 'vis-network';
 import 'vis-network/styles/vis-network.css';
 
 const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
     const visJsRef = useRef(null);
     const networkRef = useRef(null);
+
+    const [showInflow, setShowInflow] = useState(true);
+    const [showOutflow, setShowOutflow] = useState(true);
+    const [showDraw, setShowDraw] = useState(true);
 
     useEffect(() => {
         if (!visJsRef.current || !selectedDept || activeTab !== 'network') return;
@@ -19,9 +23,20 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
         // 建立一個計數器，用來記錄「兩校之間」目前畫到第幾條線了
         const pairCountMap = {};
 
-        // 處理連線樣式：根據 drawn 與流動方向給予不同的視覺暗示
+        // 處理連線：先過濾出跟本系有關的，再根據勾選狀態過濾，最後才設定樣式
         const connectedEdges = allEdges
             .filter(edge => edge.from === selectedDept || edge.to === selectedDept)
+            // 新增：根據勾選的狀態進行過濾
+            .filter(edge => {
+                if (edge.drawn) {
+                    return showDraw; // 平手
+                } else if (edge.from === selectedDept) {
+                    return showOutflow; // 流出
+                } else if (edge.to === selectedDept) {
+                    return showInflow; // 流入
+                }
+                return false;
+            })
             .map(edge => {
                 const newEdge = { ...edge };
                 delete newEdge.value; // 避免因為 value 太大導致線條粗到蓋住畫面
@@ -52,7 +67,7 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
 
                     // 判斷是流入還是流出
                     if (newEdge.from === selectedDept) {
-                        // 🩸 流失 (本系是 Loser)：紅色警戒線
+                        // 🔴 流失 (本系是 Loser)：紅色警戒線
                         newEdge.color = { color: '#e74c3c', highlight: '#c0392b', hover: '#c0392b' };
                         newEdge.width = 2.5;
                     } else if (newEdge.to === selectedDept) {
@@ -104,10 +119,7 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
                     y: 2
                 }
             },
-
-            // 使用自訂的 smooth 設定，不要用預設的
             edges: {},
-
             physics: {
                 enabled: true,
                 solver: 'barnesHut',
@@ -128,11 +140,51 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
             interaction: { hover: true, tooltipDelay: 200 }
         };
         networkRef.current = new Network(visJsRef.current, data, options);
-    }, [selectedDept, graphData, activeTab, rankings]);
+
+    }, [selectedDept, graphData, activeTab, rankings, showInflow, showOutflow, showDraw]);
 
     return (
-        <div className="vis-container-wrapper" style={{ display: activeTab === 'network' ? 'block' : 'none' }}>
-            <div ref={visJsRef} className="vis-graph-container" />
+        <div className="vis-container-wrapper" style={{
+            display: activeTab === 'network' ? 'flex' : 'none',
+            flexDirection: 'column',
+            height: '100%'
+        }}>
+            <div className="network-filter-bar" style={{
+                padding: '10px',
+                display: 'flex',
+                gap: '20px',
+                justifyContent: 'center',
+                backgroundColor: '#f8f9fa',
+                borderBottom: '1px solid #ddd',
+                borderRadius: '8px 8px 0 0'
+            }}>
+                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#27ae60' }}>
+                    <input
+                        type="checkbox"
+                        checked={showInflow}
+                        onChange={(e) => setShowInflow(e.target.checked)}
+                    />
+                    🟢 顯示流入
+                </label>
+                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#c0392b' }}>
+                    <input
+                        type="checkbox"
+                        checked={showOutflow}
+                        onChange={(e) => setShowOutflow(e.target.checked)}
+                    />
+                    🔴 顯示流出
+                </label>
+                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#7f8c8d' }}>
+                    <input
+                        type="checkbox"
+                        checked={showDraw}
+                        onChange={(e) => setShowDraw(e.target.checked)}
+                    />
+                    🔘 顯示平手交集
+                </label>
+            </div>
+
+            <div ref={visJsRef} className="vis-graph-container" style={{ flexGrow: 1, minHeight: '500px' }} />
         </div>
     );
 };

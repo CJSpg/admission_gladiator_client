@@ -1,21 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 
 const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLabel }) => {
-    const [expandedYears, setExpandedYears] = useState({});
+    // 幻燈片當前頁面的索引值 (0 代表起始學年度)
+    const [currentIndex, setCurrentIndex] = useState(0);
 
-    const toggleYear = (year) => {
-        setExpandedYears(prev => ({
-            ...prev,
-            [year]: !prev[year]
-        }));
+    // 計算 PR 值的公式：(1 - (名次 - 1) / 總數) * 100
+    // 這樣能保證第一名必定是 PR 100，最後一名依據池子大小遞減，比名次更具指標性
+    const computePR = (rank, total) => {
+        if (!rank || !total) return 0;
+        return Math.round((1 - (rank - 1) / total) * 100);
     };
 
-    if (!timelineRankData || timelineRankData.length === 0) {
-        return <div style={{ padding: '20px', textAlign: 'center' }}>📊 正在計算競爭力時間軸...</div>;
-    }
-
     const timelineNodes = useMemo(() => {
-        // 建立全域名稱對照表 (確保退出的學校，即使今年不在名單裡也能找到它的名字)
+        if (!timelineRankData || timelineRankData.length === 0) return [];
+
         const allNames = {};
         timelineRankData.forEach(data => {
             if (data.names) {
@@ -26,219 +24,270 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
         return timelineRankData.map((data, index) => {
             let joined = [];
             let left = [];
-            let rankChange = 0;
+            let unchanged = []; // 新增：沒有變動的校系
+            let prChange = 0;
+            const totalCount = data.totalCount || Object.keys(data.ranks).length;
+
+            const currRank = data.ranks[selectedDept];
+            const myPR = currRank ? computePR(currRank, totalCount) : '--';
 
             if (index > 0) {
                 const prevData = timelineRankData[index - 1];
+                const prevTotalCount = prevData.totalCount || Object.keys(prevData.ranks).length;
 
-                // 使用真實關聯圖連線的 activeIds 來判斷進出 (如果沒有，回退使用 ranks 鍵值)
                 const prevIds = prevData.activeIds || Object.keys(prevData.ranks);
                 const currIds = data.activeIds || Object.keys(data.ranks);
 
-                // 篩選新增與退出，並確保排除自己本身
+                // 篩選出三種變動狀態（排除自己本身）
                 const newIds = currIds.filter(id => !prevIds.includes(id) && id !== selectedDept);
                 const leftIds = prevIds.filter(id => !currIds.includes(id) && id !== selectedDept);
+                const sameIds = currIds.filter(id => prevIds.includes(id) && id !== selectedDept);
 
-                // 透過全域對照表找校系名稱
                 const getName = (id) => allNames[id] || trendDepts.find(d => d.id === id)?.name || id;
 
                 joined = newIds.map(getName);
                 left = leftIds.map(getName);
+                unchanged = sameIds.map(getName);
 
                 const prevRank = prevData.ranks[selectedDept];
-                const currRank = data.ranks[selectedDept];
                 if (prevRank && currRank) {
-                    rankChange = prevRank - currRank;
+                    const prevPR = computePR(prevRank, prevTotalCount);
+                    prChange = myPR - prevPR; // PR 越高越好，故用新減舊
                 }
             }
 
+            // 轉換競爭對手清單，並改用 PR 值重新進行「由大到小」排序
             const sortedCompetitors = Object.entries(data.ranks)
-                .sort((a, b) => a[1] - b[1])
                 .map(([id, rank]) => {
                     const name = allNames[id] || trendDepts.find(d => d.id === id)?.name || id;
                     return {
                         id,
                         rank,
+                        pr: computePR(rank, totalCount),
                         name,
                         isMe: id === selectedDept
                     };
-                });
+                })
+                .sort((a, b) => b.pr - a.pr); // PR 高的排在前面
 
             return {
                 ...data,
                 joined,
                 left,
-                rankChange,
-                myRank: data.ranks[selectedDept] || '--',
-                sortedCompetitors
+                unchanged,
+                prChange,
+                myPR,
+                sortedCompetitors,
+                totalCount
             };
         });
     }, [timelineRankData, trendDepts, selectedDept]);
 
+    // 安全保護：當切換不同校系導致資料長度改變時，自動校正索引值
+    useEffect(() => {
+        if (timelineNodes.length > 0 && currentIndex >= timelineNodes.length) {
+            setCurrentIndex(timelineNodes.length - 1);
+        }
+    }, [timelineNodes, currentIndex]);
+
+    if (!timelineRankData || timelineRankData.length === 0 || timelineNodes.length === 0) {
+        return <div style={{ padding: '20px', textAlign: 'center' }}>📊 正在計算競爭力時間軸...</div>;
+    }
+
+    const node = timelineNodes[currentIndex];
+
     return (
         <div className="chart-wrapper">
             <h3 style={{ marginBottom: '5px' }}>⏳ 競爭群體演進時間軸</h3>
-            <p style={{ textAlign: 'center', fontSize: '13px', color: '#7f8c8d', marginBottom: '20px', marginTop: 0 }}>
-                💡 追蹤歷年競爭對手數量的變化、完整名單，以及 {myLabel} 在群體中的名次起伏。
+            <p style={{ textAlign: 'center', fontSize: '13px', color: '#7f8c8d', marginBottom: '25px', marginTop: 0 }}>
+                💡 追蹤歷年競爭對手組合演進、完整名單，以及 {myLabel} 在群體中的 PR 戰略定位起伏。
             </p>
 
-            <div style={{ display: 'flex', overflowX: 'auto', padding: '10px 10px 30px 10px', alignItems: 'flex-start', minHeight: '350px' }}>
-                {timelineNodes.map((node, index) => {
-                    const isExpanded = !!expandedYears[node.year];
+            {/* 🎯 幻燈片控制按鈕區塊 */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '25px' }}>
+                <button
+                    disabled={currentIndex === 0}
+                    onClick={() => setCurrentIndex(prev => prev - 1)}
+                    style={{
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        border: '1px solid #3498db',
+                        backgroundColor: currentIndex === 0 ? '#ecf0f1' : '#fff',
+                        color: currentIndex === 0 ? '#count' : '#3498db',
+                        cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
+                        fontWeight: 'bold',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    ◀ 上一學年
+                </button>
+                <span style={{ fontWeight: 'bold', fontSize: '16px', color: '#2c3e50', minWidth: '80px', textAlign: 'center' }}>
+                    {node.year}
+                </span>
+                <button
+                    disabled={currentIndex === timelineNodes.length - 1}
+                    onClick={() => setCurrentIndex(prev => prev + 1)}
+                    style={{
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        border: '1px solid #3498db',
+                        backgroundColor: currentIndex === timelineNodes.length - 1 ? '#ecf0f1' : '#fff',
+                        color: currentIndex === timelineNodes.length - 1 ? '#count' : '#3498db',
+                        cursor: currentIndex === timelineNodes.length - 1 ? 'not-allowed' : 'pointer',
+                        fontWeight: 'bold',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    下一學年 ▶
+                </button>
+            </div>
 
-                    return (
-                        <React.Fragment key={node.year}>
-                            {/* 區塊 A：過渡橋樑 */}
-                            {index > 0 && (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 15px', marginTop: '30px', minWidth: '220px' }}>
-                                    <div style={{ width: '100%', height: '3px', backgroundColor: '#bdc3c7', position: 'relative', marginBottom: '15px' }}>
-                                        <div style={{ position: 'absolute', right: '-6px', top: '-5px', width: '0', height: '0', borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderLeft: '10px solid #bdc3c7' }} />
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+            {/* 🎯 幻燈片主要內容看板 (左右並排) */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'stretch',
+                gap: '25px',
+                padding: '0 10px',
+                minHeight: '360px',
+                maxWidth: '780px',
+                margin: '0 auto'
+            }}>
 
-                                        {/* ✨ 新增區塊 */}
-                                        {node.joined.length > 0 && (
-                                            <div style={{ backgroundColor: '#eafaf1', border: '1px solid #2ecc71', borderRadius: '6px', padding: '8px', fontSize: '12px', color: '#27ae60' }}>
-                                                <strong style={{ display: 'block', marginBottom: '6px' }}>✨ 新增 ({node.joined.length})</strong>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                    {node.joined.map((name, i) => {
-                                                        // 💡 將文字依照空白或換行切開
-                                                        const nameParts = (name || '').split(/[\n\s]+/).filter(Boolean);
-                                                        return (
-                                                            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', lineHeight: '1.4' }}>
-                                                                {/* 左邊：自訂圓點，固定寬度絕對不被壓縮 */}
-                                                                <span style={{ flexShrink: 0, width: '14px', marginTop: '0px' }}>•</span>
-                                                                {/* 右邊：文字區塊垂直排列 */}
-                                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
-                                                                    {nameParts.map((part, idx) => (
-                                                                        <span key={idx}>{part}</span>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
+                {/* 1. 左側資訊：變動情報區（寬度自適應佔滿左半邊） */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '240px' }}>
+                    <div style={{ borderBottom: '2px solid #bdc3c7', paddingBottom: '6px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#34495e' }}>🔄 競爭群體異動情報</span>
+                    </div>
 
-                                        {/* 🏃 退出區塊 */}
-                                        {node.left.length > 0 && (
-                                            <div style={{ backgroundColor: '#fdf2e9', border: '1px solid #e67e22', borderRadius: '6px', padding: '8px', fontSize: '12px', color: '#d35400' }}>
-                                                <strong style={{ display: 'block', marginBottom: '6px' }}>🏃 退出 ({node.left.length})</strong>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                    {node.left.map((name, i) => {
-                                                        // 💡 將文字依照空白或換行切開
-                                                        const nameParts = (name || '').split(/[\n\s]+/).filter(Boolean);
-                                                        return (
-                                                            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', lineHeight: '1.4' }}>
-                                                                {/* 左邊：自訂圓點，固定寬度絕對不被壓縮 */}
-                                                                <span style={{ flexShrink: 0, width: '14px', marginTop: '0px' }}>•</span>
-                                                                {/* 右邊：文字區塊垂直排列 */}
-                                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
-                                                                    {nameParts.map((part, idx) => (
-                                                                        <span key={idx}>{part}</span>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
+                    {currentIndex === 0 ? (
+                        // 起始年度特殊視覺提示
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: '#95a5a6', backgroundColor: '#f8f9fa', border: '1px dashed #bdc3c7', borderRadius: '8px', padding: '20px', textAlign: 'center', lineHeight: '1.6' }}>
+                            📅 本學年為觀測波段的「起始起點」<br />無前一年度之變動軌跡可供比對。
+                        </div>
+                    ) : (
+                        // 💡 放寬 maxHeight 限制，配合標籤雲設計，盡量一次展現
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '350px', paddingRight: '4px' }}>
 
-                                        {node.joined.length === 0 && node.left.length === 0 && (
-                                            <div style={{ fontSize: '12px', color: '#95a5a6', textAlign: 'center', backgroundColor: '#f4f6f6', padding: '8px', borderRadius: '6px' }}>
-                                                該年度群體無變動
-                                            </div>
-                                        )}
+                            {/* 🟡 新增區塊 (標籤雲排版) */}
+                            {node.joined.length > 0 && (
+                                <div style={{ backgroundColor: '#eafaf1', border: '1px solid #2ecc71', borderRadius: '8px', padding: '10px', color: '#27ae60' }}>
+                                    <strong style={{ display: 'block', marginBottom: '8px', fontSize: '13px' }}>🟡 {node.year} 新增對手 ({node.joined.length})</strong>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        {node.joined.map((name, i) => (
+                                            <span key={i} style={{ backgroundColor: '#fff', border: '1px solid #82e0aa', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', color: '#1e8449', whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                                                {(name || '').replace(/\n/g, ' ').trim()}
+                                            </span>
+                                        ))}
                                     </div>
                                 </div>
                             )}
 
-                            {/* 區塊 B：年份卡片 */}
-                            <div style={{ flexShrink: 0, width: '240px', backgroundColor: '#fff', border: '2px solid #3498db', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                                <div style={{ backgroundColor: '#3498db', color: '#fff', textAlign: 'center', padding: '12px', fontWeight: 'bold', fontSize: '16px', letterSpacing: '1px' }}>
-                                    {node.year}
-                                </div>
-
-                                <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    <div style={{ borderBottom: '1px solid #ecf0f1', paddingBottom: '12px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ color: '#7f8c8d', fontSize: '13px', fontWeight: 'bold' }}>競爭總數</span>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <strong style={{ fontSize: '20px', color: '#2c3e50' }}>{node.totalCount} <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#7f8c8d' }}>校系</span></strong>
-                                                <button
-                                                    onClick={() => toggleYear(node.year)}
-                                                    style={{ fontSize: '12px', padding: '2px 6px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: isExpanded ? '#ecf0f1' : '#fff', color: '#333' }}
-                                                >
-                                                    {isExpanded ? '▲ 收合' : '▼ 明細'}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {isExpanded && (
-                                            <div style={{ marginTop: '10px', backgroundColor: '#f9f9f9', padding: '8px 10px', borderRadius: '6px', maxHeight: '180px', overflowY: 'auto', border: '1px solid #eee' }}>
-                                                {node.sortedCompetitors.map(c => {
-                                                    const nameParts = (c.name || '').split(/[\n\s]+/).filter(Boolean);
-
-                                                    return (
-                                                        <div
-                                                            key={c.id}
-                                                            style={{
-                                                                display: 'flex',
-                                                                alignItems: 'flex-start',
-                                                                fontSize: '12px',
-                                                                color: c.isMe ? '#e74c3c' : '#555',
-                                                                fontWeight: c.isMe ? 'bold' : 'normal',
-                                                                marginBottom: '8px',
-                                                                lineHeight: '1.4',
-                                                                borderBottom: c.isMe ? '1px dashed #fadbd8' : '1px dashed #eee',
-                                                                paddingBottom: '6px'
-                                                            }}
-                                                        >
-                                                            <span style={{ flexShrink: 0, width: '28px', color: c.isMe ? '#e74c3c' : '#999', marginTop: '1px' }}>
-                                                                #{c.rank}
-                                                            </span>
-
-                                                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
-                                                                {nameParts.map((part, i) => (
-                                                                    <span key={i}>{part}</span>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
+                            {/* 🔴 退出區塊 (標籤雲排版) */}
+                            {node.left.length > 0 && (
+                                <div style={{ backgroundColor: '#fdf2e9', border: '1px solid #e67e22', borderRadius: '8px', padding: '10px', color: '#d35400' }}>
+                                    <strong style={{ display: 'block', marginBottom: '8px', fontSize: '13px' }}>🔴 {node.year} 退出競爭 ({node.left.length})</strong>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        {node.left.map((name, i) => (
+                                            <span key={i} style={{ backgroundColor: '#fff', border: '1px solid #f0b27a', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', color: '#ba4a00', whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                                                {(name || '').replace(/\n/g, ' ').trim()}
+                                            </span>
+                                        ))}
                                     </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                        <span style={{ color: '#7f8c8d', fontSize: '13px', fontWeight: 'bold', marginTop: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                            {myLabel}排名
-                                        </span>
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginLeft: '10px' }}>
-                                            <strong style={{ fontSize: '24px', color: '#e74c3c', whiteSpace: 'nowrap' }}>
-                                                第 {node.myRank} 名
-                                            </strong>
-
-                                            {index > 0 && node.rankChange !== 0 && (
-                                                <div style={{ fontSize: '13px', color: node.rankChange > 0 ? '#27ae60' : '#c0392b', marginTop: '6px', fontWeight: 'bold', backgroundColor: node.rankChange > 0 ? '#eafaf1' : '#fdedec', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                                                    {node.rankChange > 0 ? `▲ 進步 ${node.rankChange} 名` : `▼ 退步 ${Math.abs(node.rankChange)} 名`}
-                                                </div>
-                                            )}
-                                            {index > 0 && node.rankChange === 0 && (
-                                                <div style={{ fontSize: '13px', color: '#7f8c8d', marginTop: '6px', backgroundColor: '#f4f6f6', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                                                    持平
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
                                 </div>
+                            )}
+
+                            {/* 🔘 持平未變動區塊 (標籤雲排版) */}
+                            {node.unchanged.length > 0 && (
+                                <div style={{ backgroundColor: '#f4f6f7', border: '1px solid #bdc3c7', borderRadius: '8px', padding: '10px', color: '#566573' }}>
+                                    <strong style={{ display: 'block', marginBottom: '8px', fontSize: '13px' }}>🔘 穩定留存對手 ({node.unchanged.length})</strong>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        {node.unchanged.map((name, i) => (
+                                            <span key={i} style={{ backgroundColor: '#fff', border: '1px solid #d5d8dc', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', color: '#34495e', whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                                                {(name || '').replace(/\n/g, ' ').trim()}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* 2. 右側資訊：學年度核心戰略卡片 (固定寬度 270px，維持視覺重心) */}
+                <div style={{ flexShrink: 0, width: '270px', backgroundColor: '#fff', border: '2px solid #3498db', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ backgroundColor: '#3498db', color: '#fff', textAlign: 'center', padding: '10px', fontWeight: 'bold', fontSize: '15px', letterSpacing: '1px' }}>
+                        📊 {node.year} 戰況總覽
+                    </div>
+
+                    <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1, justifyContent: 'space-between' }}>
+                        {/* 上半部：競爭總數與直接開啟的名細 */}
+                        <div style={{ borderBottom: '1px solid #ecf0f1', paddingBottom: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ color: '#7f8c8d', fontSize: '13px', fontWeight: 'bold' }}>群體總數</span>
+                                <strong style={{ fontSize: '18px', color: '#2c3e50' }}>{node.totalCount} <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#7f8c8d' }}>個校系</span></strong>
                             </div>
-                        </React.Fragment>
-                    );
-                })}
+
+                            {/* 💡 預設直接打開，維持原有的理想高度與滾動條機制 */}
+                            <div style={{ backgroundColor: '#f9f9f9', padding: '8px 10px', borderRadius: '6px', maxHeight: '160px', overflowY: 'auto', border: '1px solid #eee' }}>
+                                {node.sortedCompetitors.map(c => (
+                                    <div
+                                        key={c.id}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            fontSize: '12px',
+                                            color: c.isMe ? '#e74c3c' : '#555',
+                                            fontWeight: c.isMe ? 'bold' : 'normal',
+                                            marginBottom: '8px',
+                                            lineHeight: '1.4',
+                                            borderBottom: c.isMe ? '1px dashed #fadbd8' : '1px dashed #eee',
+                                            paddingBottom: '6px'
+                                        }}
+                                    >
+                                        {/* 💡 排名標籤全面重構為 PR 值 */}
+                                        <span style={{ flexShrink: 0, width: '52px', color: c.isMe ? '#e74c3c' : '#7f8c8d', fontWeight: 'bold' }}>
+                                            PR {c.pr}
+                                        </span>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
+                                            {(c.name || '').split(/[\n\s]+/).filter(Boolean).map((part, i) => (
+                                                <span key={i}>{part}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 下半部：本校系 PR 定位與變動趨勢 */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <span style={{ color: '#7f8c8d', fontSize: '13px', fontWeight: 'bold', marginTop: '4px', whiteSpace: 'nowrap' }}>
+                                {myLabel}定位
+                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginLeft: '10px' }}>
+                                <strong style={{ fontSize: '24px', color: '#e74c3c', whiteSpace: 'nowrap' }}>
+                                    PR {node.myPR}
+                                </strong>
+
+                                {currentIndex > 0 && node.prChange !== 0 && (
+                                    <div style={{ fontSize: '12px', color: node.prChange > 0 ? '#27ae60' : '#c0392b', marginTop: '6px', fontWeight: 'bold', backgroundColor: node.prChange > 0 ? '#eafaf1' : '#fdedec', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                                        {node.prChange > 0 ? `▲ PR 提升 ${node.prChange} 點` : `▼ PR 下降 ${Math.abs(node.prChange)} 點`}
+                                    </div>
+                                )}
+                                {currentIndex > 0 && node.prChange === 0 && (
+                                    <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '6px', backgroundColor: '#f4f6f6', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                                        PR 持平
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
             </div>
         </div>
     );
