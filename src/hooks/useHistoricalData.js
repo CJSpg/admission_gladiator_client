@@ -89,13 +89,22 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                 results.forEach(({ year, rankingData, yearGraphData }) => {
                     if (!yearGraphData || !yearGraphData.edges || !yearGraphData.nodes) return;
 
-                    // 1. 找出該年度真實跟 selectedDept 有連線的學校
-                    const yearEdges = yearGraphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
-                    const yearTargetIds = new Set([selectedDept]);
-                    yearEdges.forEach(e => {
-                        yearTargetIds.add(e.from);
-                        yearTargetIds.add(e.to);
-                    });
+                    // 1. 找出該年度真實跟 selectedDept (根據相同名稱解析出該年度 ID) 有連線的學校
+                    const currentFullName = targetNamesMap[selectedDept] || idToName[selectedDept];
+                    const normalizedCurrentName = normalizeName(currentFullName);
+                    const deptThisYear = (rankingData || []).find(d => normalizeName(d.name) === normalizedCurrentName);
+                    const yearDeptId = deptThisYear ? deptThisYear.id : null;
+
+                    let yearTargetIds = new Set();
+                    let yearEdges = [];
+                    if (yearDeptId) {
+                        yearEdges = yearGraphData.edges.filter(edge => edge.from === yearDeptId || edge.to === yearDeptId);
+                        yearTargetIds.add(yearDeptId);
+                        yearEdges.forEach(e => {
+                            yearTargetIds.add(e.from);
+                            yearTargetIds.add(e.to);
+                        });
+                    }
 
                     // 2. 準備該年度的名稱對照表
                     const yearNames = {};
@@ -133,7 +142,8 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                         rawScores: rawScores,
                         names: yearNames, // ✨ 記錄當年度的真實名稱
                         activeIds: Array.from(yearTargetIds), // ✨ 記錄當年度真實連線的ID，作為退出/加入判斷依據
-                        totalCount: rankingThisYear.length
+                        totalCount: rankingThisYear.length,
+                        selectedDeptId: yearDeptId // ✨ 記錄該年度 selectedDept 的真實 ID
                     });
                 });
 

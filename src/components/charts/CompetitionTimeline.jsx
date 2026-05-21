@@ -28,7 +28,8 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
             let prChange = 0;
             const totalCount = data.totalCount || Object.keys(data.ranks).length;
 
-            const currRank = data.ranks[selectedDept];
+            const currDeptId = data.selectedDeptId || selectedDept;
+            const currRank = data.ranks[currDeptId];
             const myPR = currRank ? computePR(currRank, totalCount) : '--';
 
             if (index > 0) {
@@ -38,10 +39,12 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
                 const prevIds = prevData.activeIds || Object.keys(prevData.ranks);
                 const currIds = data.activeIds || Object.keys(data.ranks);
 
+                const prevDeptId = prevData.selectedDeptId || selectedDept;
+
                 // 篩選出三種變動狀態（排除自己本身）
-                const newIds = currIds.filter(id => !prevIds.includes(id) && id !== selectedDept);
-                const leftIds = prevIds.filter(id => !currIds.includes(id) && id !== selectedDept);
-                const sameIds = currIds.filter(id => prevIds.includes(id) && id !== selectedDept);
+                const newIds = currIds.filter(id => !prevIds.includes(id) && id !== currDeptId);
+                const leftIds = prevIds.filter(id => !currIds.includes(id) && id !== prevDeptId);
+                const sameIds = currIds.filter(id => prevIds.includes(id) && id !== currDeptId);
 
                 const getName = (id) => allNames[id] || trendDepts.find(d => d.id === id)?.name || id;
 
@@ -49,7 +52,7 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
                 left = leftIds.map(getName);
                 unchanged = sameIds.map(getName);
 
-                const prevRank = prevData.ranks[selectedDept];
+                const prevRank = prevData.ranks[prevDeptId];
                 if (prevRank && currRank) {
                     const prevPR = computePR(prevRank, prevTotalCount);
                     prChange = myPR - prevPR; // PR 越高越好，故用新減舊
@@ -65,7 +68,7 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
                         rank,
                         pr: computePR(rank, totalCount),
                         name,
-                        isMe: id === selectedDept
+                        isMe: id === currDeptId
                     };
                 })
                 .sort((a, b) => b.pr - a.pr); // PR 高的排在前面
