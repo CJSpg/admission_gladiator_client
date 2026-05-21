@@ -63,6 +63,7 @@ function App() {
           rankings={rankings}
           years={years}
           selectedDimension={selectedDimension}
+          currentYear={selectedYear}
         />
       </div>
     </div>
