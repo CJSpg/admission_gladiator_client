@@ -209,11 +209,9 @@ const PlacementQuadrantChart = ({
                         // Recalculate PR in the context of this specific year
                         const rankingsWithPr = calculatePercentileRank(data, 'avg_score');
 
-                        // Find the department (by ID or exact normalized name)
+                        // Find the department by exact normalized name (since IDs are reused and unstable across years)
                         const deptData = rankingsWithPr.find(item => {
-                            if (item.id === selectedDept) return true;
-                            if (normalizedCurrentName && normalizeName(item.name) === normalizedCurrentName) return true;
-                            return false;
+                            return normalizedCurrentName && normalizeName(item.name) === normalizedCurrentName;
                         });
 
                         if (!deptData) return null;

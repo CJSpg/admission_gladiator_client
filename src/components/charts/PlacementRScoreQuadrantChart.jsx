@@ -237,11 +237,9 @@ const PlacementRScoreQuadrantChart = ({
                         const rScorePrData = calculatePercentileRank(data, 'r_score', 'r_score_pr');
                         const bothPrData = calculatePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr');
 
-                        // Find the department (by ID or exact normalized name)
+                        // Find the department by exact normalized name (since IDs are reused and unstable across years)
                         const deptData = bothPrData.find(item => {
-                            if (item.id === selectedDept) return true;
-                            if (normalizedCurrentName && normalizeName(item.name) === normalizedCurrentName) return true;
-                            return false;
+                            return normalizedCurrentName && normalizeName(item.name) === normalizedCurrentName;
                         });
 
                         if (!deptData) return null;
