@@ -517,11 +517,16 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
                 `;
             }
 
-            // Execute the fetch against local vLLM API
-            const response = await fetch('http://127.0.0.1:18000/v1/chat/completions', {
+            // In development mode, use the Vite proxy to bypass CORS and support cross-machine calls.
+            // In production, fallback to direct localhost IP.
+            const isDev = import.meta.env.DEV;
+            const apiUrl = isDev ? '/local-api/v1/chat/completions' : 'http://127.0.0.1:18000/v1/chat/completions';
+
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer EMPTY'
                 },
                 body: JSON.stringify({
                     model: 'google/gemma-4-E4B-it',
