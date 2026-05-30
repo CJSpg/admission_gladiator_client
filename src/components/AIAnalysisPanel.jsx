@@ -341,6 +341,9 @@ const AIAnalysisPanel = ({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // 用於追蹤最新的請求鍵，防止異步請求回傳時覆蓋新分頁的狀態 (Race Condition)
+    const latestCacheKeyRef = useRef('');
+
     // In-memory cache ref to avoid hitting GPU on tab switches
     // Key format: `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}_${trendType}_${quadrantMode}`
     const cacheRef = useRef({});
@@ -351,6 +354,8 @@ const AIAnalysisPanel = ({
         const cacheKey = `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}` +
             (activeTab === 'trend' ? `_${trendType}` : '') +
             (activeTab === 'quadrant' ? `_${quadrantMode}` : '');
+        
+        latestCacheKeyRef.current = cacheKey;
 
         // 1. Check Cache
         if (cacheRef.current[cacheKey]) {
@@ -374,7 +379,8 @@ const AIAnalysisPanel = ({
 
         // Choose prompt and content based on activeTab
         // System Prompt strictly forbids conversational preamble to resolve user issues with "好的，身為專家..."
-        let systemPrompt = "你是一個高階教育校務研究與招生戰略分析專家。請只使用正體中文（繁體中文）回答問題。請直接輸出分析結果（直接從大標題或第一段診斷內容開始），絕對不能包含任何社交寒暄、客套話、前言、開場白（例如「好的，我將為您分析...」、「身為分析專家，我將針對...」等）以及結語，直奔分析主題。";
+        // Also strictly forbids LaTeX math notation to resolve display of raw $ and \times symbols
+        let systemPrompt = "你是一個高階教育校務研究與招生戰略分析專家。請只使用正體中文（繁體中文）回答問題。請直接輸出分析結果（直接從大標題或第一段診斷內容開始），絕對不能包含任何社交寒暄、客套話、前言、開場白（例如「好的，我將為您分析...」、「身為分析專家，我將針對...」等）以及結語，直奔分析主題。重要：請勿使用 LaTeX 數學符號或 LaTeX 語法（例如：不要使用 $ 符號包裹算式、不要使用 \\times、\\%、\\frac 等 LaTeX 命令），請直接使用一般文字與符號（如：使用 × 或 * 表示相乘、使用 % 表示百分比、直接書寫 4/4 = 100% 即可）。";
         let prompt = "";
 
         try {
@@ -697,16 +703,33 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
             const resData = await response.json();
             const resultText = resData.choices[0].message.content;
 
-            // Save to Cache
-            cacheRef.current[cacheKey] = resultText;
+            // 清理 LaTeX 格式與數學公式符號 (如 $...$, \times, \% 等)
+            const cleanedText = resultText
+                .replace(/\$([^$]+)\$/g, '$1') // 移除包含在 $ ... $ 內部的包裹字元
+                .replace(/\\%/g, '%')           // 將 \% 轉換為 %
+                .replace(/\\times/g, '×')       // 將 \times 轉換為 ×
+                .replace(/\\div/g, '÷')         // 將 \div 轉換為 ÷
+                .replace(/\\cdot/g, '·');       // 將 \cdot 轉換為 ·
 
-            setAnalysis(resultText);
+            // 檢查是否在此請求回傳期間，使用者已經切換了分頁/校系，若是則直接捨棄此回應 (解決 Race Condition)
+            if (latestCacheKeyRef.current !== cacheKey) {
+                return;
+            }
+
+            // Save to Cache
+            cacheRef.current[cacheKey] = cleanedText;
+
+            setAnalysis(cleanedText);
             setError('');
         } catch (err) {
             console.error('vLLM fetch error:', err);
-            setError(`無法從本地 vLLM 伺服器獲取分析結果。請確保您的 Docker 容器已在連接埠 18000 啟動，且模型已載入。 (Error: ${err.message})`);
+            if (latestCacheKeyRef.current === cacheKey) {
+                setError(`無法從本地 vLLM 伺服器獲取分析結果。請確保您的 Docker 容器已在連接埠 18000 啟動，且模型已載入。 (Error: ${err.message})`);
+            }
         } finally {
-            setIsLoading(false);
+            if (latestCacheKeyRef.current === cacheKey) {
+                setIsLoading(false);
+            }
         }
     };
 
