@@ -19,8 +19,9 @@ import {
  */
 export const parseNumber = (val) => {
     if (val === undefined || val === null || val === '--' || val === '') return null;
-    const num = Number(String(val).replace(/,/g, ''));
-    return isNaN(num) ? null : num;
+    const str = String(val).trim().replace(/,/g, '');
+    const num = Number(str);
+    return Number.isFinite(num) ? num : null;
 };
 
 /**
@@ -35,27 +36,28 @@ export const normalizeName = (name) => {
  * Handles ties using average rank logic.
  * PR = ((avgRank - 1) / (N - 1)) * 100
  */
-export const calculatePercentileRank = (data, key) => {
+export const calculatePercentileRank = (data, key, outputKey) => {
     if (!data || data.length === 0) return [];
+
+    // Initialize result with a shallow copy of each item and set outputKey to null
+    const result = data.map(item => ({ ...item, [outputKey]: null }));
 
     // Filter valid entries
     const validItems = data
         .map((item, index) => ({
             originalIndex: index,
-            val: parseNumber(item[key]),
-            originalItem: item
+            val: parseNumber(item[key])
         }))
         .filter(item => item.val !== null);
 
     const N = validItems.length;
     if (N === 0) {
-        return data.map(item => ({ ...item, [`${key}_pr`]: null }));
+        return result;
     }
 
     if (N === 1) {
-        const result = data.map(item => ({ ...item, [`${key}_pr`]: null }));
         const itemIdx = validItems[0].originalIndex;
-        result[itemIdx] = { ...result[itemIdx], [`${key}_pr`]: 100 };
+        result[itemIdx][outputKey] = 100;
         return result;
     }
 
@@ -78,84 +80,216 @@ export const calculatePercentileRank = (data, key) => {
         i = j;
     }
 
-    // Add PR value back to the dataset
-    const result = data.map(item => ({ ...item, [`${key}_pr`]: null }));
+    // Add PR value back to the result dataset
     validItems.forEach(item => {
-        result[item.originalIndex] = {
-            ...item.originalItem,
-            [`${key}_pr`]: Number(item.pr.toFixed(2))
-        };
+        result[item.originalIndex][outputKey] = Number(item.pr.toFixed(2));
     });
 
     return result;
 };
 
 /**
- * Classifies coordinates into quadrants and provides localized descriptions.
+ * Extracts the exam group name from a department's name field in the 'group' dimension.
+ * Expected format: "SchoolName\nDepartmentName\nGroupName"
  */
-export const getQuadrant = (yieldRatePercent, avgScorePr) => {
-    if (yieldRatePercent === null || avgScorePr === null || yieldRatePercent === undefined || avgScorePr === undefined) {
+export const getGroupName = (name) => {
+    if (!name) return 'UNKNOWN';
+    const parts = name.split('\n');
+    return parts[2] ? parts[2].trim() : 'UNKNOWN';
+};
+
+/**
+ * Calculates the Average Score Percentile Rank (PR) in a potentially group-segregated manner.
+ * If dimension is 'group', calculations are done *within* each respective exam group.
+ * Otherwise, calculations are done globally.
+ */
+export const calculateAverageScorePercentileRank = (data, key, outputKey, dimension) => {
+    if (!data || data.length === 0) return [];
+
+    if (dimension !== 'group') {
+        return calculatePercentileRank(data, key, outputKey);
+    }
+
+    // Partition logic for group dimension
+    const groups = {};
+    data.forEach((item, index) => {
+        const grp = getGroupName(item.name);
+        if (!groups[grp]) {
+            groups[grp] = [];
+        }
+        groups[grp].push({ item, index });
+    });
+
+    const result = data.map(item => ({ ...item, [outputKey]: null }));
+
+    Object.keys(groups).forEach(grp => {
+        const groupItems = groups[grp].map(g => g.item);
+        const rankedGroupItems = calculatePercentileRank(groupItems, key, outputKey);
+
+        groups[grp].forEach((g, idx) => {
+            result[g.index][outputKey] = rankedGroupItems[idx][outputKey];
+        });
+    });
+
+    return result;
+};
+
+
+/**
+ * Classifies coordinates into quadrants and provides localized descriptions for Mode 1.
+ * X axis: r_score_pr (50)
+ * Y axis: avg_score_pr (50)
+ */
+export const getQuadrantRScoreAvg = (rScorePr, avgScorePr) => {
+    if (rScorePr === null || avgScorePr === null || rScorePr === undefined || avgScorePr === undefined) {
         return { name: '資料不足', desc: '無法判斷招生象限' };
     }
-    const yieldThreshold = 95;
-    const prThreshold = 50;
 
-    if (yieldRatePercent >= yieldThreshold && avgScorePr >= prThreshold) {
+    if (rScorePr >= 50 && avgScorePr >= 50) {
         return {
-            name: '高品質穩定型',
-            desc: '目前本校系組位於「高品質穩定型」象限，代表其平均分數 PR 高於同群類中位水準，且報到率達到穩定標準，顯示該校系組在錄取學生品質與報到轉換上皆具有良好表現。'
+            name: '強勢落點型',
+            desc: '目前本校系組位於「強勢落點型」象限，代表其 R-Score PR 與平均分數 PR 皆高於同年度、同維度之中位水準，顯示該校系組在招生市場中具有較佳競爭位置，且錄取學生分數品質亦相對較高，屬於招生落點表現較佳之類型。'
         };
-    } else if (yieldRatePercent < yieldThreshold && avgScorePr >= prThreshold) {
+    } else if (rScorePr >= 50 && avgScorePr < 50) {
         return {
-            name: '高分流失型',
-            desc: '目前本校系組位於「高分流失型」象限，代表其錄取學生平均分數 PR 較高，但報到率未達穩定標準，顯示該校系組雖具備吸引高分學生之能力，但錄取後可能存在學生流失情形，建議搭配學生流動分析與競爭關係網路進一步檢視主要流失對象。'
+            name: '競爭支撐型',
+            desc: '目前本校系組位於「競爭支撐型」象限，代表其 R-Score PR 高於中位水準，但平均分數 PR 低於中位水準，顯示該校系組具備一定招生競爭位置，但錄取學生分數品質仍有提升空間。建議後續搭配錄取分數趨勢與招生效益分析，觀察是否存在分數品質未同步提升之現象。'
         };
-    } else if (yieldRatePercent >= yieldThreshold && avgScorePr < prThreshold) {
+    } else if (rScorePr < 50 && avgScorePr >= 50) {
         return {
-            name: '穩定但品質待提升型',
-            desc: '目前本校系組位於「穩定但品質待提升型」象限，代表其報到率達到穩定標準，但平均分數 PR 低於同群類中位水準，顯示招生轉換穩定，但錄取學生分數品質仍有提升空間。'
+            name: '分數支撐型',
+            desc: '目前本校系組位於「分數支撐型」象限，代表其平均分數 PR 高於中位水準，但 R-Score PR 低於中位水準，顯示錄取學生分數品質相對不差，但整體招生競爭位置未同步提升。建議進一步搭配競爭關係網路與學生流動分析，檢視是否受到競爭校系或流動結構影響。'
         };
     } else {
         return {
-            name: '招生風險型',
-            desc: '目前本校系組位於「招生風險型」象限，代表其報到率與平均分數 PR 皆低於設定標準，顯示該校系組在招生品質與報到穩定度上皆相對弱勢，建議優先檢討招生定位、競爭校系與學生流向。'
+            name: '落點弱勢型',
+            desc: '目前本校系組位於「落點弱勢型」象限，代表其 R-Score PR 與平均分數 PR 皆低於同年度、同維度之中位水準，顯示招生競爭力與錄取學生分數品質皆相對弱勢，應列為招生策略優先檢討對象。'
+        };
+    }
+};
+
+/**
+ * Classifies coordinates into quadrants and provides localized descriptions for Mode 2.
+ * X axis: zheng_effect_percent (50)
+ * Y axis: yield_rate_percent (50)
+ */
+export const getQuadrantEffectYield = (zhengEffect, yieldRate) => {
+    if (zhengEffect === null || yieldRate === null || zhengEffect === undefined || yieldRate === undefined) {
+        return { name: '資料不足', desc: '無法判斷招生象限' };
+    }
+    const zhengThreshold = 50;
+    const yieldThreshold = 50;
+
+    if (zhengEffect >= zhengThreshold && yieldRate >= yieldThreshold) {
+        return {
+            name: '高效穩定型',
+            desc: '目前本校系組位於「高效穩定型」象限，代表其正取有效性與報到率皆高於設定標準。這顯示正取學生有極高意願就讀，且最終報到狀況非常穩定，招生精準度與吸引力皆表現優異。'
+        };
+    } else if (zhengEffect < zhengThreshold && yieldRate >= yieldThreshold) {
+        return {
+            name: '備取依賴型',
+            desc: '目前本校系組位於「備取依賴型」象限，代表報到率達到穩定標準，但正取有效性較低。這顯示大部分正取學生流失，但透過備取遞補成功填滿名額。建議檢視招生定位，或調整正備取倍率與篩選標準。'
+        };
+    } else if (zhengEffect >= zhengThreshold && yieldRate < yieldThreshold) {
+        return {
+            name: '精準但不足型',
+            desc: '目前本校系組位於「精準但不足型」象限，代表正取有效性高，但最終報到率未達穩定標準。這顯示雖然錄取的學生報到意願高，但可能因為招生名額過多、備取人數不足或有缺額情形，導致整體報到率偏低。'
+        };
+    } else {
+        return {
+            name: '招生弱勢型',
+            desc: '目前本校系組位於「招生弱勢型」象限，代表正取有效性與報到率皆未達標準。這顯示正取學生就讀意願低，且最終報到轉換狀況欠佳，屬於招生風險較高之校系，建議優先檢討招生策略與競爭對手關係。'
         };
     }
 };
 
 // --- Custom Tooltip Component ---
 
-const CustomTooltip = ({ active, payload }) => {
+const CustomTooltip = ({ active, payload, selectedDept, mode }) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
-        const quadrant = getQuadrant(data.x, data.y);
-        return (
-            <div style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(4px)',
-                border: '1px solid rgba(224, 224, 224, 0.8)',
-                padding: '15px',
-                borderRadius: '10px',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                fontSize: '13px',
-                color: '#2c3e50',
-                minWidth: '240px'
-            }}>
-                <div style={{ fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: '8px', marginBottom: '8px', fontSize: '14px', lineHeight: '1.4' }}>
-                    {data.name.split('\n').map((line, i) => <div key={i}>{line}</div>)}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div>📊 報到率: <strong style={{ color: '#2c3e50' }}>{data.x != null ? `${data.x.toFixed(1)}%` : '--'}</strong></div>
-                    <div>⭐ 平均分數 PR: <strong style={{ color: '#2ecc71' }}>{data.y != null ? `PR ${data.y.toFixed(1)}` : '--'}</strong></div>
-                    <div>📝 平均分數: <strong>{data.avgScore != null ? data.avgScore.toFixed(2) : '--'}</strong></div>
-                    <div>⚡ R-Score: <strong>{data.rScore != null ? data.rScore.toFixed(3) : '--'}</strong></div>
-                    <div>🛡️ 正取有效性: <strong>{data.zhengEffect != null ? `${(data.zhengEffect * 100).toFixed(1)}%` : '--'}</strong></div>
-                    <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed #eee', fontWeight: 'bold', color: '#e74c3c' }}>
-                        📍 定位: {quadrant.name}
+        if (!data) return null;
+
+        const isSelf = data.id === selectedDept;
+
+        if (mode === 'rscore_avg') {
+            const rScorePr = data.r_score_pr !== undefined ? data.r_score_pr : data.x;
+            const avgScorePr = data.avg_score_pr !== undefined ? data.avg_score_pr : data.y;
+            const quadrant = getQuadrantRScoreAvg(rScorePr, avgScorePr);
+
+            return (
+                <div style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(4px)',
+                    border: '1px solid rgba(224, 224, 224, 0.8)',
+                    padding: '15px',
+                    borderRadius: '10px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    fontSize: '13px',
+                    color: '#2c3e50',
+                    minWidth: '260px'
+                }}>
+                    <div style={{ fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: '8px', marginBottom: '8px', fontSize: '14px', lineHeight: '1.4' }}>
+                        {data.name ? data.name.split('\n').map((line, i) => <div key={i}>{line}</div>) : '--'}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div>⚡ R-Score：<strong>{data.r_score != null ? data.r_score.toFixed(3) : '--'}</strong></div>
+                        <div>📊 R-Score PR：<strong style={{ color: '#3498db' }}>{rScorePr != null ? rScorePr.toFixed(1) : '--'}</strong></div>
+                        <div>📝 平均分數：<strong>{data.avg_score != null ? data.avg_score.toFixed(3) : '--'}</strong></div>
+                        <div>⭐ 平均分數 PR：<strong style={{ color: '#2ecc71' }}>{avgScorePr != null ? avgScorePr.toFixed(1) : '--'}</strong></div>
+                        {isSelf ? (
+                            <div style={{ color: '#ef4444', fontWeight: 'bold', marginTop: '4px' }}>📍 目前選取校系組</div>
+                        ) : (
+                            <div style={{ color: '#475569', marginTop: '4px' }}>
+                                🔗 與本校系組關聯權重：<strong>{data.relationWeight || 0}</strong>
+                            </div>
+                        )}
+                        <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed #eee', fontWeight: 'bold', color: '#e74c3c' }}>
+                            📍 象限：{quadrant.name}
+                        </div>
                     </div>
                 </div>
-            </div>
-        );
+            );
+        } else {
+            // Mode: effect_yield
+            const zhengEffectPercent = data.zheng_effect_percent !== undefined ? data.zheng_effect_percent : data.x;
+            const yieldRatePercent = data.yield_rate_percent !== undefined ? data.yield_rate_percent : data.y;
+            const quadrant = getQuadrantEffectYield(zhengEffectPercent, yieldRatePercent);
+
+            return (
+                <div style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(4px)',
+                    border: '1px solid rgba(224, 224, 224, 0.8)',
+                    padding: '15px',
+                    borderRadius: '10px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    fontSize: '13px',
+                    color: '#2c3e50',
+                    minWidth: '260px'
+                }}>
+                    <div style={{ fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: '8px', marginBottom: '8px', fontSize: '14px', lineHeight: '1.4' }}>
+                        {data.name ? data.name.split('\n').map((line, i) => <div key={i}>{line}</div>) : '--'}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div>🛡️ 正取有效性：<strong style={{ color: '#2ecc71' }}>{zhengEffectPercent != null ? `${zhengEffectPercent.toFixed(1)}%` : '--'}</strong></div>
+                        <div>📊 報到率：<strong style={{ color: '#3498db' }}>{yieldRatePercent != null ? `${yieldRatePercent.toFixed(1)}%` : '--'}</strong></div>
+                        <div>⚡ R-Score：<strong>{data.r_score != null ? data.r_score.toFixed(3) : '--'}</strong></div>
+                        <div>📝 平均分數：<strong>{data.avg_score != null ? data.avg_score.toFixed(3) : '--'}</strong></div>
+                        {isSelf ? (
+                            <div style={{ color: '#ef4444', fontWeight: 'bold', marginTop: '4px' }}>📍 目前選取校系組</div>
+                        ) : (
+                            <div style={{ color: '#475569', marginTop: '4px' }}>
+                                🔗 與本校系組關聯權重：<strong>{data.relationWeight || 0}</strong>
+                            </div>
+                        )}
+                        <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed #eee', fontWeight: 'bold', color: '#e74c3c' }}>
+                            📍 象限：{quadrant.name}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
     }
     return null;
 };
@@ -168,15 +302,21 @@ const PlacementQuadrantChart = ({
     selectedDimension,
     years,
     currentYear,
-    myLabel
+    myLabel,
+    graphData,
+    trendDepts
 }) => {
-    const [historicalPath, setHistoricalPath] = useState([]);
+    // Mode switcher: 'rscore_avg' (R-score PR vs Avg Score PR) or 'effect_yield' (Zheng effect vs Yield rate)
+    const [mode, setMode] = useState('rscore_avg');
+    const [historicalPathRaw, setHistoricalPathRaw] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     // Fetch and process historical data to build selected department's path
     useEffect(() => {
+        let isCurrent = true;
+        setHistoricalPathRaw([]); // Clear immediately when selectedDept changes
+
         if (!selectedDept || !selectedDimension || !years || years.length === 0) {
-            setHistoricalPath([]);
             return;
         }
 
@@ -202,32 +342,36 @@ const PlacementQuadrantChart = ({
 
                 const results = await Promise.all(promises);
 
+                if (!isCurrent) return;
+
                 const pathPoints = results
                     .map(({ year, data }) => {
                         if (!data || !Array.isArray(data)) return null;
 
-                        // Recalculate PR in the context of this specific year
-                        const rankingsWithPr = calculatePercentileRank(data, 'avg_score');
+                        // Recalculate PR in the context of this specific year for Mode 1
+                        const rScorePrData = calculatePercentileRank(data, 'r_score', 'r_score_pr');
+                        const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
 
-                        // Find the department by exact normalized name (since IDs are reused and unstable across years)
-                        const deptData = rankingsWithPr.find(item => {
+                        // Find the department by exact normalized name
+                        const deptData = bothPrData.find(item => {
                             return normalizedCurrentName && normalizeName(item.name) === normalizedCurrentName;
                         });
 
                         if (!deptData) return null;
 
-                        const yieldRate = parseNumber(deptData.yield_rate);
+                        const rScorePr = parseNumber(deptData.r_score_pr);
                         const avgScorePr = parseNumber(deptData.avg_score_pr);
-
-                        if (yieldRate === null || avgScorePr === null) return null;
+                        const yieldRate = parseNumber(deptData.yield_rate);
+                        const zhengEffect = parseNumber(deptData.zheng_effect);
 
                         return {
                             year: String(year),
-                            x: yieldRate * 100,
-                            y: avgScorePr,
-                            avgScore: parseNumber(deptData.avg_score),
-                            rScore: parseNumber(deptData.r_score),
-                            zhengEffect: parseNumber(deptData.zheng_effect),
+                            rScorePr,
+                            avgScorePr,
+                            zhengEffectPercent: zhengEffect !== null ? zhengEffect * 100 : null,
+                            yieldRatePercent: yieldRate !== null ? yieldRate * 100 : null,
+                            r_score: parseNumber(deptData.r_score),
+                            avg_score: parseNumber(deptData.avg_score),
                             name: deptData.name,
                             id: deptData.id
                         };
@@ -241,40 +385,135 @@ const PlacementQuadrantChart = ({
                     return numA - numB;
                 });
 
-                setHistoricalPath(pathPoints);
+                if (isCurrent) {
+                    setHistoricalPathRaw(pathPoints);
+                }
             } catch (err) {
                 console.error("Error loading history for PlacementQuadrantChart", err);
             } finally {
-                setLoadingHistory(false);
+                if (isCurrent) {
+                    setLoadingHistory(false);
+                }
             }
         };
 
         fetchHistory();
+
+        return () => {
+            isCurrent = false;
+        };
     }, [selectedDept, selectedDimension, years, rankings]);
 
-    // Compute PR on current year rankings
+    // Compute PR on current year rankings (Full rankings logic)
     const processedRankings = useMemo(() => {
         if (!rankings || rankings.length === 0) return [];
-        return calculatePercentileRank(rankings, 'avg_score').map(item => {
-            const yieldRate = parseNumber(item.yield_rate);
-            const yieldRatePercent = yieldRate !== null ? yieldRate * 100 : null;
-            return {
-                ...item,
-                x: yieldRatePercent,
-                y: item.avg_score_pr,
-                avgScore: parseNumber(item.avg_score),
-                rScore: parseNumber(item.r_score),
-                zhengEffect: parseNumber(item.zheng_effect)
-            };
-        });
-    }, [rankings]);
+
+        const rScorePrData = calculatePercentileRank(rankings, 'r_score', 'r_score_pr');
+        const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
+
+        return bothPrData
+            .map(item => {
+                const rScore = parseNumber(item.r_score);
+                const avgScore = parseNumber(item.avg_score);
+                const yieldRate = parseNumber(item.yield_rate);
+                const zhengEffect = parseNumber(item.zheng_effect);
+
+                return {
+                    id: item.id,
+                    name: item.name,
+                    r_score: rScore,
+                    avg_score: avgScore,
+                    r_score_pr: item.r_score_pr,
+                    avg_score_pr: item.avg_score_pr,
+                    yield_rate: yieldRate,
+                    zheng_effect: zhengEffect,
+                    yield_rate_percent: yieldRate !== null ? yieldRate * 100 : null,
+                    zheng_effect_percent: zhengEffect !== null ? zhengEffect * 100 : null,
+                    flow_rate: parseNumber(item.flow_rate)
+                };
+            })
+            .filter(Boolean);
+    }, [rankings, selectedDimension]);
+
+    // Filter to related rankings and limit displaying count
+    const finalChartData = useMemo(() => {
+        if (processedRankings.length === 0 || !selectedDept) return [];
+
+        const relatedIds = new Set([selectedDept]);
+
+        // 1. Build relatedIds based on trendDepts or graphData.edges
+        if (trendDepts && trendDepts.length > 0) {
+            trendDepts.forEach(d => {
+                if (d.id) relatedIds.add(d.id);
+            });
+        } else if (graphData?.edges?.length) {
+            graphData.edges.forEach(edge => {
+                if (edge.from === selectedDept) relatedIds.add(edge.to);
+                if (edge.to === selectedDept) relatedIds.add(edge.from);
+            });
+        }
+
+        // 2. Build relationWeightMap based on graphData.edges
+        const relationWeightMap = {};
+        if (graphData?.edges?.length) {
+            graphData.edges.forEach(edge => {
+                const weight = parseNumber(edge.value) || 0;
+                if (edge.from === selectedDept) {
+                    relationWeightMap[edge.to] = (relationWeightMap[edge.to] || 0) + weight;
+                }
+                if (edge.to === selectedDept) {
+                    relationWeightMap[edge.from] = (relationWeightMap[edge.from] || 0) + weight;
+                }
+            });
+        }
+
+        const mappedData = processedRankings
+            .map(d => {
+                let x = null;
+                let y = null;
+
+                if (mode === 'rscore_avg') {
+                    x = d.r_score_pr;
+                    y = d.avg_score_pr;
+                } else {
+                    x = d.zheng_effect_percent;
+                    y = d.yield_rate_percent;
+                }
+
+                if (x === null || y === null) return null;
+
+                return {
+                    ...d,
+                    relationWeight: relationWeightMap[d.id] || 0,
+                    x,
+                    y
+                };
+            })
+            .filter(Boolean);
+
+        const selectedPoint = mappedData.find(d => d.id === selectedDept);
+
+        // Competitors filtered by relationship and sorted by weight descending, taking top 15
+        const competitorPoints = mappedData
+            .filter(d => d.id !== selectedDept && relatedIds.has(d.id))
+            .sort((a, b) => (relationWeightMap[b.id] || 0) - (relationWeightMap[a.id] || 0))
+            .slice(0, 15);
+
+        return selectedPoint
+            ? [selectedPoint, ...competitorPoints]
+            : competitorPoints;
+    }, [processedRankings, selectedDept, graphData, trendDepts, mode]);
 
     // Check basic availability of data
     if (!rankings || rankings.length === 0) {
         return (
             <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>招生品質與報到穩定四象限分析</h3>
-                <p style={{ fontSize: '14px', color: '#95a5a6' }}>資料不足，無法產生四象限落點分析。</p>
+                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
+                    四象限落點定位分析
+                </h3>
+                <p style={{ fontSize: '14px', color: '#95a5a6' }}>
+                    資料不足，無法產生四象限落點定位分析。
+                </p>
             </div>
         );
     }
@@ -283,93 +522,254 @@ const PlacementQuadrantChart = ({
     if (selectedDept && !currentDept) {
         return (
             <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>招生品質與報到穩定四象限分析</h3>
-                <p style={{ fontSize: '14px', color: '#95a5a6' }}>找不到目前選取校系組資料。</p>
+                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
+                    四象限落點定位分析
+                </h3>
+                <p style={{ fontSize: '14px', color: '#95a5a6' }}>
+                    找不到目前選取校系組資料，無法產生四象限落點定位分析。
+                </p>
             </div>
         );
     }
 
-    const plottablePoints = processedRankings.filter(item => item.x !== null && item.y !== null);
-    if (plottablePoints.length === 0) {
+    if (currentDept) {
+        if (mode === 'rscore_avg') {
+            const rVal = parseNumber(currentDept.r_score);
+            const aVal = parseNumber(currentDept.avg_score);
+            if (rVal === null || aVal === null) {
+                return (
+                    <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
+                        <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
+                            R-Score 與平均分數 PR 四象限落點分析
+                        </h3>
+                        <p style={{ fontSize: '14px', color: '#95a5a6' }}>
+                            目前選取校系組缺少 R-Score 或平均分數資料，無法進行落點分析。
+                        </p>
+                    </div>
+                );
+            }
+        } else {
+            const zVal = parseNumber(currentDept.zheng_effect);
+            const yVal = parseNumber(currentDept.yield_rate);
+            if (zVal === null || yVal === null) {
+                return (
+                    <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
+                        <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
+                            正取有效性與報到率四象限分析
+                        </h3>
+                        <p style={{ fontSize: '14px', color: '#95a5a6' }}>
+                            目前選取校系組缺少正取有效性或報到率資料，無法進行分析。
+                        </p>
+                    </div>
+                );
+            }
+        }
+    }
+
+    if (finalChartData.length === 0) {
         return (
             <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>招生品質與報到穩定四象限分析</h3>
-                <p style={{ fontSize: '14px', color: '#95a5a6' }}>資料不足，無法產生四象限落點分析。</p>
+                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
+                    四象限落點定位分析
+                </h3>
+                <p style={{ fontSize: '14px', color: '#95a5a6' }}>
+                    資料不足，無法產生四象限分析圖表。
+                </p>
             </div>
         );
     }
 
-    // Determine X-axis Domain bounds dynamically
-    const validYields = plottablePoints.map(item => item.x);
-    const minYield = validYields.length > 0 ? Math.min(...validYields) : 0;
-    const xDomain = minYield >= 80 ? [80, 100] : [0, 100];
-
     // Split points into current selection and the rest
-    const otherPoints = plottablePoints.filter(item => item.id !== selectedDept);
-    const currentDeptPoint = plottablePoints.find(item => item.id === selectedDept);
+    const otherPoints = finalChartData.filter(item => item.id !== selectedDept);
+    const currentDeptPoint = finalChartData.find(item => item.id === selectedDept);
 
-    // Current quadrant information
-    const quadrantInfo = currentDeptPoint ? getQuadrant(currentDeptPoint.x, currentDeptPoint.y) : null;
+    // Current quadrant info
+    const quadrantInfo = currentDeptPoint
+        ? (mode === 'rscore_avg'
+            ? getQuadrantRScoreAvg(currentDeptPoint.x, currentDeptPoint.y)
+            : getQuadrantEffectYield(currentDeptPoint.x, currentDeptPoint.y))
+        : null;
+
+    // Convert historicalPathRaw to specific mode coordinates
+    const historicalPath = historicalPathRaw
+        .map(point => {
+            const x = mode === 'rscore_avg' ? point.rScorePr : point.zhengEffectPercent;
+            const y = mode === 'rscore_avg' ? point.avgScorePr : point.yieldRatePercent;
+            if (x === null || y === null) return null;
+            return {
+                ...point,
+                x,
+                y
+            };
+        })
+        .filter(Boolean);
 
     // Generate YoY movement analysis
-    const generateTrendAnalysis = (path) => {
+    const generateTrendAnalysis = (path, currentMode) => {
         if (!path || path.length < 2) return null;
 
         const earliest = path[0];
         const latest = path[path.length - 1];
 
-        const deltaYield = latest.x - earliest.x;
-        const deltaPR = latest.y - earliest.y;
+        const threshold = 1.0;
 
-        const threshold = 1.0; // Changes less than 1.0 are treated as flat
-        const isYieldFlat = Math.abs(deltaYield) < threshold;
-        const isPrFlat = Math.abs(deltaPR) < threshold;
+        if (currentMode === 'rscore_avg') {
+            const deltaX = latest.rScorePr - earliest.rScorePr;
+            const deltaY = latest.avgScorePr - earliest.avgScorePr;
+            const xFlat = Math.abs(deltaX) < threshold;
+            const yFlat = Math.abs(deltaY) < threshold;
 
-        if (isYieldFlat && isPrFlat) {
+            let analysis = "";
+            if (xFlat && yFlat) {
+                analysis = "招生競爭力與錄取分數品質均呈現持平穩定態勢。";
+            } else if (xFlat) {
+                analysis = `招生競爭力（R-Score PR）呈現持平，而平均分數 PR ${deltaY > 0 ? "提升" : "下降"}，整體招生定位呈現${deltaY > 0 ? "穩定偏好" : "待加強"}。`;
+            } else if (yFlat) {
+                analysis = `平均分數 PR 呈現持平，而招生競爭力（R-Score PR）${deltaX > 0 ? "提升" : "下降"}，顯示整體招生競爭位置${deltaX > 0 ? "改善" : "轉弱"}。`;
+            } else if (deltaX > 0 && deltaY > 0) {
+                analysis = "招生競爭力與錄取分數品質同步提升，整體落點朝正向發展。";
+            } else if (deltaX > 0 && deltaY < 0) {
+                analysis = "R-Score PR 提升，代表招生競爭位置改善，但平均分數 PR 下降，顯示整體競爭力提升未完全反映在錄取分數品質上，需進一步檢視招生來源與學生組成。";
+            } else if (deltaX < 0 && deltaY > 0) {
+                analysis = "平均分數 PR 提升，但 R-Score PR 下降，表示錄取分數品質尚有支撐，但整體招生競爭位置轉弱，可能受到競爭校系、學生流動或市場偏好變化影響。";
+            } else if (deltaX < 0 && deltaY < 0) {
+                analysis = "招生競爭力與錄取分數品質皆下降，整體落點朝弱勢方向移動，應優先檢討招生策略。";
+            }
+
             return {
-                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：本系招生品質與報到率均呈現持平穩定態勢。`
-            };
-        } else if (deltaYield >= threshold && deltaPR >= threshold) {
-            return {
-                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：本系招生品質與報到穩定度同步提升，整體朝正向發展（報到率提升 ${deltaYield.toFixed(1)}%、平均分數 PR 提升 ${deltaPR.toFixed(1)}）。`
-            };
-        } else if (deltaYield <= -threshold && deltaPR >= threshold) {
-            return {
-                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：本系平均分數品質提升，但報到率下降，可能出現高分學生流失情形（報到率下降 ${Math.abs(deltaYield).toFixed(1)}%、平均分數 PR 提升 ${deltaPR.toFixed(1)}）。`
-            };
-        } else if (deltaYield >= threshold && deltaPR <= -threshold) {
-            return {
-                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：本系報到穩定度提升，但平均分數品質下降，可能是招生穩定但品質待提升（報到率提升 ${deltaYield.toFixed(1)}%、平均分數 PR 下降 ${Math.abs(deltaPR).toFixed(1)}）。`
-            };
-        } else if (deltaYield <= -threshold && deltaPR <= -threshold) {
-            return {
-                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：本系報到率與平均分數 PR 皆下降，招生狀態需優先關注（報到率下降 ${Math.abs(deltaYield).toFixed(1)}%、平均分數 PR 下降 ${Math.abs(deltaPR).toFixed(1)}）。`
+                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：${analysis}（R-Score PR ${deltaX > 0 ? '提升' : '變化'} ${deltaX.toFixed(1)}，平均分數 PR ${deltaY > 0 ? '提升' : '變化'} ${deltaY.toFixed(1)}）`
             };
         } else {
-            const yieldText = isYieldFlat ? '報到率維持持平' : `報到率${deltaYield > 0 ? `提升 ${deltaYield.toFixed(1)}%` : `下降 ${Math.abs(deltaYield).toFixed(1)}%`}`;
-            const prText = isPrFlat ? '分數品質維持持平' : `平均分數 PR ${deltaPR > 0 ? `提升 ${deltaPR.toFixed(1)}` : `下降 ${Math.abs(deltaPR).toFixed(1)}`}`;
+            // Mode: effect_yield
+            const deltaX = latest.zhengEffectPercent - earliest.zhengEffectPercent;
+            const deltaY = latest.yieldRatePercent - earliest.yieldRatePercent;
+            const xFlat = Math.abs(deltaX) < threshold;
+            const yFlat = Math.abs(deltaY) < threshold;
+
+            let analysis = "";
+            if (xFlat && yFlat) {
+                analysis = "正取有效性與報到率均呈現持平穩定態勢。";
+            } else if (xFlat) {
+                analysis = `正取有效性呈現持平，而報到率 ${deltaY > 0 ? "提升" : "下降"}，招生穩定度呈現${deltaY > 0 ? "改善" : "轉弱"}。`;
+            } else if (yFlat) {
+                analysis = `報到率呈現持平，而正取有效性 ${deltaX > 0 ? "提升" : "下降"}，顯示正取生就讀意願${deltaX > 0 ? "提高" : "降低"}。`;
+            } else if (deltaX > 0 && deltaY > 0) {
+                analysis = "正取有效性與報到率同步提升，招生精準度與轉換效益朝正向發展。";
+            } else if (deltaX > 0 && deltaY < 0) {
+                analysis = "正取有效性提升，但報到率下降，顯示正取生雖然就讀意願高，但可能因為備取名額不足或缺額，使得最終報到率偏低。";
+            } else if (deltaX < 0 && deltaY > 0) {
+                analysis = "報到率提升，但正取有效性下降，顯示正取生流失較多，但成功透過備取遞補穩定了報到率，對備取之依賴度增加。";
+            } else if (deltaX < 0 && deltaY < 0) {
+                analysis = "正取有效性與報到率皆下降，整體招生精準度與轉換率轉弱，建議檢討招生宣傳與正備取策略。";
+            }
+
             return {
-                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：本系 ${yieldText}，且 ${prText}。`
+                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：${analysis}（正取有效性 ${deltaX > 0 ? '提升' : '變化'} ${deltaX.toFixed(1)}%，報到率 ${deltaY > 0 ? '提升' : '變化'} ${deltaY.toFixed(1)}%）`
             };
         }
     };
 
-    const trendAnalysis = generateTrendAnalysis(historicalPath);
+    const trendAnalysis = generateTrendAnalysis(historicalPath, mode);
+
+    // Calculate dynamic domains and ticks depending on mode
+    let xDomain, yDomain, xTicks, yTicks;
+
+    if (mode === 'rscore_avg') {
+        const allX = [
+            ...finalChartData.map(d => d.x),
+            ...historicalPath.map(d => d.x)
+        ].filter(val => val !== null && val !== undefined);
+
+        const allY = [
+            ...finalChartData.map(d => d.y),
+            ...historicalPath.map(d => d.y)
+        ].filter(val => val !== null && val !== undefined);
+
+        const minX = allX.length > 0 ? Math.min(...allX) : 0;
+        const maxX = allX.length > 0 ? Math.max(...allX) : 100;
+        const minY = allY.length > 0 ? Math.min(...allY) : 0;
+        const maxY = allY.length > 0 ? Math.max(...allY) : 100;
+
+        xDomain = [
+            Math.max(0, Math.floor((minX - 5) / 5) * 5),
+            Math.min(100, Math.ceil((maxX + 5) / 5) * 5)
+        ];
+        yDomain = [
+            Math.max(0, Math.floor((minY - 5) / 5) * 5),
+            Math.min(100, Math.ceil((maxY + 5) / 5) * 5)
+        ];
+
+        xTicks = [];
+        for (let i = xDomain[0]; i <= xDomain[1]; i += 5) {
+            xTicks.push(i);
+        }
+
+        yTicks = [];
+        for (let i = yDomain[0]; i <= yDomain[1]; i += 5) {
+            yTicks.push(i);
+        }
+    } else {
+        // Mode: effect_yield (Keep full 0 - 100 scale, with standard ticks)
+        xDomain = [0, 100];
+        yDomain = [0, 100];
+        xTicks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        yTicks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+    }
 
     return (
-        <div className="chart-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '10px' }}>
+        <div className="chart-wrapper" style={{ display: 'flex', flexDirection: 'column', padding: '10px' }}>
             {/* Header info */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                 <h3 style={{ margin: '0 0 5px 0', fontSize: '18px', color: '#2c3e50', fontWeight: 'bold' }}>
-                    招生品質與報到穩定四象限分析
+                    {mode === 'rscore_avg' ? "R-Score 與平均分數 PR 分佈落點分析" : "正取有效性與報到率四象限分析"}
                 </h3>
                 <p style={{ margin: 0, fontSize: '13px', color: '#7f8c8d', lineHeight: '1.5' }}>
-                    以報到率作為招生穩定度指標，並以平均分數 PR 衡量錄取學生分數品質，觀察校系組於當年度招生市場中的相對位置。
+                    {mode === 'rscore_avg'
+                        ? "僅顯示目前校系組及其直接競爭／流動關係校系組；PR 值仍以完整同年度資料計算。"
+                        : "分析正取學生的就讀意願（正取有效性）與最終招生填滿度（報到率）之關係。"}
                 </p>
             </div>
 
+            {/* Premium Toggle Button Switcher */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '20px' }}>
+                <button
+                    onClick={() => setMode('rscore_avg')}
+                    style={{
+                        padding: '8px 18px',
+                        borderRadius: '20px',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: mode === 'rscore_avg' ? '#e74c3c' : '#fff',
+                        color: mode === 'rscore_avg' ? '#fff' : '#64748b',
+                        boxShadow: mode === 'rscore_avg' ? '0 4px 12px rgba(231, 76, 60, 0.2)' : 'none'
+                    }}
+                >
+                    📍 R-Score 與平均分數 PR
+                </button>
+                <button
+                    onClick={() => setMode('effect_yield')}
+                    style={{
+                        padding: '8px 18px',
+                        borderRadius: '20px',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: mode === 'effect_yield' ? '#e74c3c' : '#fff',
+                        color: mode === 'effect_yield' ? '#fff' : '#64748b',
+                        boxShadow: mode === 'effect_yield' ? '0 4px 12px rgba(231, 76, 60, 0.2)' : 'none'
+                    }}
+                >
+                    🛡️ 正取有效性與報到率
+                </button>
+            </div>
+
             {/* Scatter Plot area */}
-            <div style={{ width: '100%', height: '420px', position: 'relative', backgroundColor: '#fff', borderRadius: '12px', padding: '10px 10px 20px 10px' }}>
+            <div style={{ width: '100%', height: '400px', minHeight: '400px', flexShrink: 0, position: 'relative', backgroundColor: '#fff', borderRadius: '12px', padding: '10px 10px 20px 10px', marginBottom: '20px' }}>
                 {loadingHistory && (
                     <div style={{
                         position: 'absolute',
@@ -394,75 +794,120 @@ const PlacementQuadrantChart = ({
                         <XAxis
                             type="number"
                             dataKey="x"
-                            name="報到率"
-                            unit="%"
+                            name={mode === 'rscore_avg' ? "R-Score PR" : "正取有效性"}
                             domain={xDomain}
-                            tickFormatter={(v) => `${v}%`}
+                            ticks={xTicks}
+                            tickFormatter={(v) => mode === 'rscore_avg' ? Math.round(v) : `${Math.round(v)}%`}
                             tick={{ fontSize: 11, fill: '#64748b' }}
-                            label={{ value: '報到率（%）', position: 'bottom', offset: 5, fontSize: 13, fill: '#334155', fontWeight: 'bold' }}
+                            label={{
+                                value: mode === 'rscore_avg' ? 'R-Score PR' : '正取有效性（%）',
+                                position: 'bottom',
+                                offset: 5,
+                                fontSize: 13,
+                                fill: '#334155',
+                                fontWeight: 'bold'
+                            }}
                         />
 
                         {/* Y Axis */}
                         <YAxis
                             type="number"
                             dataKey="y"
-                            name="平均分數 PR"
-                            domain={[0, 100]}
+                            name={mode === 'rscore_avg' ? "平均分數 PR" : "報到率"}
+                            domain={yDomain}
+                            ticks={yTicks}
+                            tickFormatter={(v) => mode === 'rscore_avg' ? Math.round(v) : `${Math.round(v)}%`}
                             tick={{ fontSize: 11, fill: '#64748b' }}
-                            label={{ value: '平均分數 PR', angle: -90, position: 'insideLeft', offset: 0, fontSize: 13, fill: '#334155', fontWeight: 'bold' }}
+                            label={{
+                                value: mode === 'rscore_avg' ? '平均分數 PR' : '報到率（%）',
+                                angle: -90,
+                                position: 'insideLeft',
+                                offset: 0,
+                                fontSize: 13,
+                                fill: '#334155',
+                                fontWeight: 'bold'
+                            }}
                         />
 
-                        {/* Quadrant backgrounds */}
-                        {/* Top-Right: High Quality, Stable */}
-                        <ReferenceArea
-                            x1={95}
-                            x2={xDomain[1]}
-                            y1={50}
-                            y2={100}
-                            fill="rgba(46, 204, 113, 0.02)"
-                            label={{ value: "高品質穩定型", position: "insideTopRight", fill: "rgba(39, 174, 96, 0.4)", fontSize: 11, fontWeight: "bold" }}
-                        />
-                        {/* Top-Left: High Score, Leakage */}
-                        <ReferenceArea
-                            x1={xDomain[0]}
-                            x2={95}
-                            y1={50}
-                            y2={100}
-                            fill="rgba(241, 196, 15, 0.02)"
-                            label={{ value: "高分流失型", position: "insideTopLeft", fill: "rgba(211, 84, 0, 0.4)", fontSize: 11, fontWeight: "bold" }}
-                        />
-                        {/* Bottom-Right: Stable but Needs Improvement */}
-                        <ReferenceArea
-                            x1={95}
-                            x2={xDomain[1]}
-                            y1={0}
-                            y2={50}
-                            fill="rgba(52, 152, 219, 0.02)"
-                            label={{ value: "穩定但品質待提升型", position: "insideBottomRight", fill: "rgba(41, 128, 185, 0.4)", fontSize: 11, fontWeight: "bold" }}
-                        />
-                        {/* Bottom-Left: Admission Risk */}
-                        <ReferenceArea
-                            x1={xDomain[0]}
-                            x2={95}
-                            y1={0}
-                            y2={50}
-                            fill="rgba(231, 76, 60, 0.02)"
-                            label={{ value: "招生風險型", position: "insideBottomLeft", fill: "rgba(192, 57, 43, 0.4)", fontSize: 11, fontWeight: "bold" }}
-                        />
+                        {/* Conditional Quadrant backgrounds & dividers for effect_yield mode */}
+                        {mode === 'effect_yield' && (
+                            <>
+                                {/* Top-Right */}
+                                <ReferenceArea
+                                    x1={50}
+                                    x2={100}
+                                    y1={50}
+                                    y2={100}
+                                    fill="rgba(46, 204, 113, 0.02)"
+                                    label={{
+                                        value: "高效穩定型",
+                                        position: "insideTopRight",
+                                        fill: "rgba(39, 174, 96, 0.45)",
+                                        fontSize: 11,
+                                        fontWeight: "bold"
+                                    }}
+                                />
+                                {/* Top-Left */}
+                                <ReferenceArea
+                                    x1={0}
+                                    x2={50}
+                                    y1={50}
+                                    y2={100}
+                                    fill="rgba(241, 196, 15, 0.02)"
+                                    label={{
+                                        value: "備取依賴型",
+                                        position: "insideTopLeft",
+                                        fill: "rgba(211, 84, 0, 0.45)",
+                                        fontSize: 11,
+                                        fontWeight: "bold"
+                                    }}
+                                />
+                                {/* Bottom-Right */}
+                                <ReferenceArea
+                                    x1={50}
+                                    x2={100}
+                                    y1={0}
+                                    y2={50}
+                                    fill="rgba(52, 152, 219, 0.02)"
+                                    label={{
+                                        value: "精準但不足型",
+                                        position: "insideBottomRight",
+                                        fill: "rgba(41, 128, 185, 0.45)",
+                                        fontSize: 11,
+                                        fontWeight: "bold"
+                                    }}
+                                />
+                                {/* Bottom-Left */}
+                                <ReferenceArea
+                                    x1={0}
+                                    x2={50}
+                                    y1={0}
+                                    y2={50}
+                                    fill="rgba(231, 76, 60, 0.02)"
+                                    label={{
+                                        value: "招生弱勢型",
+                                        position: "insideBottomLeft",
+                                        fill: "rgba(192, 57, 43, 0.45)",
+                                        fontSize: 11,
+                                        fontWeight: "bold"
+                                    }}
+                                />
 
-                        {/* Reference lines (Dividers) */}
-                        <ReferenceLine x={95} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
-                        <ReferenceLine y={50} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
+                                {/* Reference lines (Dividers) */}
+                                <ReferenceLine x={50} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
+                                <ReferenceLine y={50} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
+                            </>
+                        )}
 
                         {/* Tooltip */}
-                        <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3', stroke: '#94a3b8' }} />
+                        <Tooltip content={<CustomTooltip selectedDept={selectedDept} mode={mode} />} cursor={{ strokeDasharray: '3 3', stroke: '#94a3b8' }} />
 
-                        {/* Scatter points for other departments */}
+                        {/* Scatter points for other related departments */}
                         <Scatter
                             name="其他校系"
                             data={otherPoints}
-                            fill="#94a3b8"
-                            fillOpacity={0.5}
+                            fill="#64748b"
+                            fillOpacity={0.6}
                             shape="circle"
                             legendType="none"
                         />
@@ -518,63 +963,21 @@ const PlacementQuadrantChart = ({
                 </ResponsiveContainer>
             </div>
 
-            {/* Analysis text cards at bottom */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
-                {quadrantInfo && (
-                    <div style={{
-                        padding: '16px 20px',
-                        backgroundColor: '#fff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
-                    }}>
-                        <h4 style={{ margin: '0 0 10px 0', fontSize: '15px', color: '#1e293b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            🎯 {myLabel || '本校系組'}招生定位分析
-                        </h4>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                            <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '20px',
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                backgroundColor: quadrantInfo.name === '高品質穩定型' ? '#eafaf1' :
-                                    quadrantInfo.name === '高分流失型' ? '#fdf2e9' :
-                                        quadrantInfo.name === '穩定但品質待提升型' ? '#e8f4fd' : '#fdedec',
-                                color: quadrantInfo.name === '高品質穩定型' ? '#27ae60' :
-                                    quadrantInfo.name === '高分流失型' ? '#d35400' :
-                                        quadrantInfo.name === '穩定但品質待提升型' ? '#2980b9' : '#e74c3c',
-                                border: `1px solid ${quadrantInfo.name === '高品質穩定型' ? '#2ecc71' :
-                                        quadrantInfo.name === '高分流失型' ? '#f1c40f' :
-                                            quadrantInfo.name === '穩定但品質待提升型' ? '#3498db' : '#e74c3c'
-                                    }`,
-                                whiteSpace: 'nowrap'
-                            }}>
-                                {quadrantInfo.name}
-                            </span>
-                            <p style={{ margin: 0, fontSize: '14px', color: '#475569', lineHeight: '1.6' }}>
-                                {quadrantInfo.desc}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {trendAnalysis && (
-                    <div style={{
-                        padding: '16px 20px',
-                        backgroundColor: '#fff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
-                    }}>
-                        <h4 style={{ margin: '0 0 10px 0', fontSize: '15px', color: '#1e293b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            🔄 歷年移動方向分析
-                        </h4>
-                        <p style={{ margin: 0, fontSize: '14px', color: '#475569', lineHeight: '1.6' }}>
-                            {trendAnalysis.analysisText}
-                        </p>
-                    </div>
-                )}
-            </div>
+            {/* Warning when only self is in chart */}
+            {finalChartData.length === 1 && (
+                <div style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    color: '#64748b',
+                    fontSize: '13px',
+                    textAlign: 'center',
+                    marginBottom: '15px'
+                }}>
+                    ℹ️ 目前僅找到本校系組資料，尚無直接競爭或流動關係校系組可供比較。
+                </div>
+            )}
         </div>
     );
 };

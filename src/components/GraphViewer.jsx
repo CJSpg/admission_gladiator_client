@@ -7,7 +7,7 @@ import TrendChart from './charts/TrendChart';
 import HealthChart from './charts/HealthChart';
 import CompetitionTimeline from './charts/CompetitionTimeline';
 import FlowTable from './charts/FlowTable';
-import PlacementRScoreQuadrantChart from './charts/PlacementRScoreQuadrantChart';
+import PlacementQuadrantChart from './charts/PlacementQuadrantChart';
 
 const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimension, currentYear }) => {
     const [activeTab, setActiveTab] = useState('network');
@@ -27,7 +27,7 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                 { id: 'network', label: '🤝 競爭關係網' },
                 { id: 'trend', label: '📈 歷年趨勢' },
                 { id: 'health', label: '🛡️ 招生效益' },
-                { id: 'quadrant', label: '📍 四象限分析' },
+                { id: 'quadrant', label: '📍 校系軌跡' },
                 { id: 'timeline', label: '⏳ 競爭時間軸' },
                 { id: 'flow', label: '🔄 流動情報' },
             ].map(tab => (
@@ -84,9 +84,9 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                             <HealthChart healthData={healthData} />
                         )}
 
-                        {/* 子元件：四象限落點分析 */}
+                        {/* 子元件：校系軌跡圖 */}
                         {activeTab === 'quadrant' && (
-                            <PlacementRScoreQuadrantChart
+                            <PlacementQuadrantChart
                                 rankings={rankings}
                                 selectedDept={selectedDept}
                                 selectedDimension={selectedDimension}

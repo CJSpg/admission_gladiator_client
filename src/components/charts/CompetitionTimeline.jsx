@@ -1,5 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 
+const normalizeName = (name) => {
+    return (name || "").replace(/\n/g, '').replace(/\s+/g, '').trim();
+};
+
 const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLabel }) => {
     // 幻燈片當前頁面的索引值 (0 代表起始學年度)
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -14,13 +18,6 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
     const timelineNodes = useMemo(() => {
         if (!timelineRankData || timelineRankData.length === 0) return [];
 
-        const allNames = {};
-        timelineRankData.forEach(data => {
-            if (data.names) {
-                Object.assign(allNames, data.names);
-            }
-        });
-
         return timelineRankData.map((data, index) => {
             let joined = [];
             let left = [];
@@ -32,6 +29,9 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
             const currRank = data.ranks[currDeptId];
             const myPR = currRank ? computePR(currRank, totalCount) : '--';
 
+            // Helper to get name for the CURRENT year
+            const getNameCurr = (id) => (data.names && data.names[id]) || trendDepts.find(d => d.id === id)?.name || id;
+
             if (index > 0) {
                 const prevData = timelineRankData[index - 1];
                 const prevTotalCount = prevData.totalCount || Object.keys(prevData.ranks).length;
@@ -41,28 +41,50 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
 
                 const prevDeptId = prevData.selectedDeptId || selectedDept;
 
+                // Helper to get name for the PREVIOUS year
+                const getNamePrev = (id) => (prevData.names && prevData.names[id]) || trendDepts.find(d => d.id === id)?.name || id;
+
+                // 獲取前一年與當前所有競爭對手的正規化中文名稱（使用各年獨立的對照表，避免跨年 ID 衝突）
+                const prevNames = prevIds.map(id => normalizeName(getNamePrev(id)));
+                const currNames = currIds.map(id => normalizeName(getNameCurr(id)));
+
+                const currDeptName = normalizeName(getNameCurr(currDeptId));
+                const prevDeptName = normalizeName(getNamePrev(prevDeptId));
+
                 // 篩選出三種變動狀態（排除自己本身）
-                const newIds = currIds.filter(id => !prevIds.includes(id) && id !== currDeptId);
-                const leftIds = prevIds.filter(id => !currIds.includes(id) && id !== prevDeptId);
-                const sameIds = currIds.filter(id => prevIds.includes(id) && id !== currDeptId);
+                // 1. 新增對手：在當前年度名單中，但不在前一年度名單中，且不是自己
+                const newIds = currIds.filter(id => {
+                    const name = normalizeName(getNameCurr(id));
+                    return !prevNames.includes(name) && name !== currDeptName;
+                });
+                
+                // 2. 退出對手：在前一年度名單中，但不在當前年度名單中，且不是自己
+                const leftIds = prevIds.filter(id => {
+                    const name = normalizeName(getNamePrev(id));
+                    return !currNames.includes(name) && name !== prevDeptName;
+                });
 
-                const getName = (id) => allNames[id] || trendDepts.find(d => d.id === id)?.name || id;
+                // 3. 持平對手：在兩年名單中皆有出現，且不是自己
+                const sameIds = currIds.filter(id => {
+                    const name = normalizeName(getNameCurr(id));
+                    return prevNames.includes(name) && name !== currDeptName;
+                });
 
-                joined = newIds.map(getName);
-                left = leftIds.map(getName);
-                unchanged = sameIds.map(getName);
+                joined = newIds.map(getNameCurr);
+                left = leftIds.map(getNamePrev);
+                unchanged = sameIds.map(getNameCurr);
 
                 const prevRank = prevData.ranks[prevDeptId];
                 if (prevRank && currRank) {
                     const prevPR = computePR(prevRank, prevTotalCount);
-                    prChange = myPR - prevPR; // PR 越高越好，故用新減舊
+                    prChange = myPR - prevPR;
                 }
             }
 
             // 轉換競爭對手清單，並改用 PR 值重新進行「由大到小」排序
             const sortedCompetitors = Object.entries(data.ranks)
                 .map(([id, rank]) => {
-                    const name = allNames[id] || trendDepts.find(d => d.id === id)?.name || id;
+                    const name = getNameCurr(id);
                     return {
                         id,
                         rank,
@@ -275,7 +297,7 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
                                     PR {node.myPR}
                                 </strong>
 
-                                {currentIndex > 0 && node.prChange !== 0 && (
+                                {/* {currentIndex > 0 && node.prChange !== 0 && (
                                     <div style={{ fontSize: '12px', color: node.prChange > 0 ? '#27ae60' : '#c0392b', marginTop: '6px', fontWeight: 'bold', backgroundColor: node.prChange > 0 ? '#eafaf1' : '#fdedec', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', whiteSpace: 'nowrap' }}>
                                         {node.prChange > 0 ? `▲ PR 提升 ${node.prChange} 點` : `▼ PR 下降 ${Math.abs(node.prChange)} 點`}
                                     </div>
@@ -284,7 +306,7 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
                                     <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '6px', backgroundColor: '#f4f6f6', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', whiteSpace: 'nowrap' }}>
                                         PR 持平
                                     </div>
-                                )}
+                                )} */}
                             </div>
                         </div>
 

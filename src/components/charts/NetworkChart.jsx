@@ -12,10 +12,6 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
 
     useEffect(() => {
         if (!visJsRef.current || !selectedDept || activeTab !== 'network') return;
-        if (networkRef.current) {
-            networkRef.current.destroy();
-            networkRef.current = null;
-        }
         const { nodes: allNodes, edges: allEdges } = graphData;
         const targetNode = allNodes.find(node => node.id === selectedDept);
         if (!targetNode) return;
@@ -140,6 +136,13 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
             interaction: { hover: true, tooltipDelay: 200 }
         };
         networkRef.current = new Network(visJsRef.current, data, options);
+
+        return () => {
+            if (networkRef.current) {
+                networkRef.current.destroy();
+                networkRef.current = null;
+            }
+        };
 
     }, [selectedDept, graphData, activeTab, rankings, showInflow, showOutflow, showDraw]);
 
