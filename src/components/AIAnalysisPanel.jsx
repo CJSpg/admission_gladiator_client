@@ -346,65 +346,186 @@ const AIAnalysisPanel = ({
 
     // In-memory cache ref to avoid hitting GPU on tab switches
     // Key format: `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}_${trendType}_${quadrantMode}`
+    // cacheRef.current[cacheKey] = { status: 'success'|'pending'|'error', data: string, error: string, promise: Promise }
     const cacheRef = useRef({});
 
     useEffect(() => {
         if (!selectedDept || !activeTab) return;
 
-        const cacheKey = `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}` +
+        let isCurrent = true;
+
+        const currentActiveKey = `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}` +
             (activeTab === 'trend' ? `_${trendType}` : '') +
             (activeTab === 'quadrant' ? `_${quadrantMode}` : '');
         
-        latestCacheKeyRef.current = cacheKey;
+        latestCacheKeyRef.current = currentActiveKey;
 
-        // 1. Check Cache
-        if (cacheRef.current[cacheKey]) {
-            setAnalysis(cacheRef.current[cacheKey]);
-            setError('');
-            setIsLoading(false);
-            return;
-        }
+        // 1. 優先載入或請求目前分頁分析
+        getOrFetch(currentActiveKey, activeTab, trendType, quadrantMode);
 
-        // 2. Fetch AI Analysis
-        fetchAIAnalysis(cacheKey);
+        // 2. 延遲 1 秒後，在背景依序預載入其他分頁的分析 (避免同時對 local GPU 送出大量請求造成塞車)
+        const timer = setTimeout(() => {
+            const tabsToPrefetch = [
+                { id: 'network', trend: 'rscore_avgscore', quad: 'rscore_avg' },
+                { id: 'trend', trend: 'rscore_avgscore', quad: 'rscore_avg' },
+                { id: 'health', trend: 'rscore_avgscore', quad: 'rscore_avg' },
+                { id: 'quadrant', trend: 'rscore_avgscore', quad: 'rscore_avg' },
+                { id: 'timeline', trend: 'rscore_avgscore', quad: 'rscore_avg' },
+                { id: 'flow', trend: 'rscore_avgscore', quad: 'rscore_avg' }
+            ].filter(t => {
+                if (t.id === activeTab) {
+                    if (activeTab === 'trend' && t.trend === trendType) return false;
+                    if (activeTab === 'quadrant' && t.quad === quadrantMode) return false;
+                    if (activeTab !== 'trend' && activeTab !== 'quadrant') return false;
+                }
+                return true;
+            });
+
+            // 啟動背景佇列預載入
+            prefetchSequentially(tabsToPrefetch, isCurrent);
+        }, 1000);
+
+        return () => {
+            isCurrent = false;
+            clearTimeout(timer);
+        };
     }, [selectedDept, activeTab, selectedDimension, currentYear, trendType, quadrantMode]);
 
-    const fetchAIAnalysis = async (cacheKey) => {
-        setIsLoading(true);
-        setError('');
-        setAnalysis('');
+    const prefetchSequentially = async (tabs, isCurrent) => {
+        for (const t of tabs) {
+            if (!isCurrent) break;
 
+            const cacheKey = `${currentYear}_${selectedDimension}_${selectedDept}_${t.id}` +
+                (t.id === 'trend' ? `_${t.trend}` : '') +
+                (t.id === 'quadrant' ? `_${t.quad}` : '');
+
+            // 若該分頁的快取已存在或正在請求中，則跳過
+            if (cacheRef.current[cacheKey]) {
+                continue;
+            }
+
+            try {
+                // 在背景發起非同步 Fetch 並存入快取 (使用 Promise)
+                await getOrFetch(cacheKey, t.id, t.trend, t.quad);
+            } catch (err) {
+                console.warn('Background prefetch error for key:', cacheKey, err);
+            }
+        }
+    };
+
+    const getOrFetch = (cacheKey, tabId, tType, qMode) => {
+        // A. 命中快取且已完成，直接呈現
+        if (cacheRef.current[cacheKey]) {
+            const entry = cacheRef.current[cacheKey];
+            if (entry.status === 'success') {
+                if (latestCacheKeyRef.current === cacheKey) {
+                    setAnalysis(entry.data);
+                    setError('');
+                    setIsLoading(false);
+                }
+                return entry.promise;
+            } else if (entry.status === 'pending') {
+                // B. 快取中已有正在進行的請求，進行監聽並顯示載入中
+                if (latestCacheKeyRef.current === cacheKey) {
+                    setIsLoading(true);
+                    setError('');
+                    setAnalysis('');
+                }
+                entry.promise.then(
+                    (data) => {
+                        if (latestCacheKeyRef.current === cacheKey) {
+                            setAnalysis(data);
+                            setError('');
+                            setIsLoading(false);
+                        }
+                    },
+                    (err) => {
+                        if (latestCacheKeyRef.current === cacheKey) {
+                            setError(err.message);
+                            setIsLoading(false);
+                        }
+                    }
+                );
+                return entry.promise;
+            }
+        }
+
+        // C. 快取中沒有此鍵，發起全新請求
+        if (latestCacheKeyRef.current === cacheKey) {
+            setIsLoading(true);
+            setError('');
+            setAnalysis('');
+        }
+
+        const fetchPromise = doApiFetch(tabId, tType, qMode);
+
+        cacheRef.current[cacheKey] = {
+            status: 'pending',
+            data: '',
+            error: '',
+            promise: fetchPromise
+        };
+
+        fetchPromise.then(
+            (resultText) => {
+                cacheRef.current[cacheKey] = {
+                    status: 'success',
+                    data: resultText,
+                    error: '',
+                    promise: fetchPromise
+                };
+                if (latestCacheKeyRef.current === cacheKey) {
+                    setAnalysis(resultText);
+                    setError('');
+                    setIsLoading(false);
+                }
+            },
+            (err) => {
+                cacheRef.current[cacheKey] = {
+                    status: 'error',
+                    data: '',
+                    error: err.message,
+                    promise: fetchPromise
+                };
+                if (latestCacheKeyRef.current === cacheKey) {
+                    setError(err.message);
+                    setIsLoading(false);
+                }
+            }
+        );
+
+        return fetchPromise;
+    };
+
+    const doApiFetch = async (tabId, tType, qMode) => {
         const targetName = currentDeptInfo?.name ? currentDeptInfo.name.replace(/\n/g, ' ') : selectedDept;
         const dimensionText = selectedDimension === 'school' ? '學校' : selectedDimension === 'group' ? '系組' : '科系';
 
-        // Choose prompt and content based on activeTab
-        // System Prompt strictly forbids conversational preamble to resolve user issues with "好的，身為專家..."
-        // Also strictly forbids LaTeX math notation to resolve display of raw $ and \times symbols
+        // Choose prompt and content based on tabId
         let systemPrompt = "你是一個高階教育校務研究與招生戰略分析專家。請只使用正體中文（繁體中文）回答問題。請直接輸出分析結果（直接從大標題或第一段診斷內容開始），絕對不能包含任何社交寒暄、客套話、前言、開場白（例如「好的，我將為您分析...」、「身為分析專家，我將針對...」等）以及結語，直奔分析主題。重要：請勿使用 LaTeX 數學符號或 LaTeX 語法（例如：不要使用 $ 符號包裹算式、不要使用 \\times、\\%、\\frac 等 LaTeX 命令），請直接使用一般文字與符號（如：使用 × 或 * 表示相乘、使用 % 表示百分比、直接書寫 4/4 = 100% 即可）。";
         let prompt = "";
 
-        try {
-            if (activeTab === 'network') {
-                const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
-                const inflow = [];
-                const outflow = [];
-                const draws = [];
+        if (tabId === 'network') {
+            const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
+            const inflow = [];
+            const outflow = [];
+            const draws = [];
 
-                connectedEdges.forEach(edge => {
-                    if (edge.from === edge.to) return;
-                    const fromName = rankings.find(r => r.id === edge.from)?.name.replace(/\n/g, ' ') || edge.from;
-                    const toName = rankings.find(r => r.id === edge.to)?.name.replace(/\n/g, ' ') || edge.to;
+            connectedEdges.forEach(edge => {
+                if (edge.from === edge.to) return;
+                const fromName = rankings.find(r => r.id === edge.from)?.name.replace(/\n/g, ' ') || edge.from;
+                const toName = rankings.find(r => r.id === edge.to)?.name.replace(/\n/g, ' ') || edge.to;
 
-                    if (edge.drawn) {
-                        draws.push(`- 與【${edge.from === selectedDept ? toName : fromName}】平手交集（雙重錄取考生皆放棄）：${edge.value || 0} 人`);
-                    } else if (edge.from === selectedDept) {
-                        outflow.push(`- 流失至【${toName}】（考生選擇對方）：${edge.value || 0} 人`);
-                    } else {
-                        inflow.push(`- 從【${fromName}】流入（考生選擇本校）：${edge.value || 0} 人`);
-                    }
-                });
+                if (edge.drawn) {
+                    draws.push(`- 與【${edge.from === selectedDept ? toName : fromName}】平手交集（雙重錄取考生皆放棄）：${edge.value || 0} 人`);
+                } else if (edge.from === selectedDept) {
+                    outflow.push(`- 流失至【${toName}】（考生選擇對方）：${edge.value || 0} 人`);
+                } else {
+                    inflow.push(`- 從【${fromName}】流入（考生選擇本校）：${edge.value || 0} 人`);
+                }
+            });
 
-                prompt = `
+            prompt = `
 請針對以下【競爭關係網】數據進行深入分析，為校方提出具體招生建議：
 
 分析對象：${targetName}
@@ -431,36 +552,34 @@ ${draws.length > 0 ? draws.join('\n') : '- 無顯著平手交集數據'}
 1. 識別核心競爭圈：誰是我們真正的競爭對手？最主要的生源威脅來自誰？
 2. 競爭力強弱診斷：我們在哪些對手上佔有絕對優勢？在哪些對手上處於極度弱勢？其背後可能代表何種品牌形象或就業吸引力差距？
 3. 校方應對建議：面對主要的流失渠道，校方該採取何種具體戰略（如獎學金、課程特色行銷、面試日期撞期排程等）進行阻截？請以條列方式提出具體操作建議。
-                `;
-            } else if (activeTab === 'trend') {
-                const trendRows = [];
-                // Gather target and top 3 competitors
-                const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
-                const topCompetitors = connectedEdges
-                    .map(e => e.from === selectedDept ? e.to : e.from)
-                    .filter((value, index, self) => self.indexOf(value) === index)
-                    .map(id => {
-                        const edgeSum = connectedEdges
-                            .filter(e => e.from === id || e.to === id)
-                            .reduce((sum, e) => sum + (e.value || 0), 0);
-                        return { id, weight: edgeSum };
-                    })
-                    .sort((a, b) => b.weight - a.weight)
-                    .slice(0, 3)
-                    .map(c => c.id);
+            `;
+        } else if (tabId === 'trend') {
+            const trendRows = [];
+            const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
+            const topCompetitors = connectedEdges
+                .map(e => e.from === selectedDept ? e.to : e.from)
+                .filter((value, index, self) => self.indexOf(value) === index)
+                .map(id => {
+                    const edgeSum = connectedEdges
+                        .filter(e => e.from === id || e.to === id)
+                        .reduce((sum, e) => sum + (e.value || 0), 0);
+                    return { id, weight: edgeSum };
+                })
+                .sort((a, b) => b.weight - a.weight)
+                .slice(0, 3)
+                .map(c => c.id);
 
-                // Fetch rankings for each year
-                historicalData.forEach(yrData => {
-                    trendRows.push(`- **${yrData.name}** (本校): R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
-                    topCompetitors.forEach(compId => {
-                        const compName = rankings.find(r => r.id === compId)?.name.replace(/\n/g, ' ') || compId;
-                        trendRows.push(`  - 對手【${compName}】: R-Score = ${yrData[`${compId}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${compId}_AvgScore`] || 'N/A'}`);
-                    });
+            historicalData.forEach(yrData => {
+                trendRows.push(`- **${yrData.name}** (本校): R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
+                topCompetitors.forEach(compId => {
+                    const compName = rankings.find(r => r.id === compId)?.name.replace(/\n/g, ' ') || compId;
+                    trendRows.push(`  - 對手【${compName}】: R-Score = ${yrData[`${compId}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${compId}_AvgScore`] || 'N/A'}`);
                 });
+            });
 
-                if (trendType === 'rscore') {
-                    prompt = `
-請針對以下【歷年發展趨勢 - R-Score 競爭力趨勢】數據進行深度分析，診斷本校系 brand 強度的演進：
+            if (tType === 'rscore') {
+                prompt = `
+請針對以下【歷年發展趨勢 - R-Score 競爭力趨勢】數據進行深度分析，診斷本校系品牌強度的演進：
 
 分析對象：${targetName}
 歷年比較數據（包含主要重榜競爭對手）：
@@ -473,9 +592,9 @@ ${trendRows.join('\n')}
 1. 本校品牌吸引力變遷：過去三年，本校的 R-Score 呈現上升、持平還是下降趨勢？這反映了本校在招生市場上的品牌形象發生了何種變化？
 2. 與競爭對手的 R-Score 消長對比：與主要競爭對手相比，我們的品牌吸引力優勢是否在流失？是否有特定的對手 R-Score 快速崛起，對我們構成直接威脅？
 3. 校方品牌強化建議：針對品牌吸引力的消長，校方應該如何在宣傳、系所定位、產學合作或就業宣傳上進行戰略強化，以提升重榜考生的選擇率？請以條列方式提出具體操作建議。
-                    `;
-                } else if (trendType === 'avgscore') {
-                    prompt = `
+                `;
+            } else if (tType === 'avgscore') {
+                prompt = `
 請針對以下【歷年發展趨勢 - 錄取分數門檻趨勢】數據進行深度分析，診斷錄取生源素質的演進：
 
 分析對象：${targetName}
@@ -489,10 +608,9 @@ ${trendRows.join('\n')}
 1. 錄取門檻走勢診斷：過去三年，本校的平均分數門檻是上升、持平還是下滑？這反映了生源素質的何種演變趨勢？
 2. 與主要對手的門檻差距消長：在錄取分數門檻上，我們與主要對手的差距是在拉大還是縮小？我們處於領先還是落後？
 3. 篩選機制調整建議：根據錄取門檻趨勢，校方在二階甄試的考科篩選、加權倍率或是名額配置上，該如何進行微調以確保錄取生源水準，或防止因分數崩盤導致的口碑下滑？請以條列方式提出具體政策建議。
-                    `;
-                } else {
-                    // 預設為 'rscore_avgscore' (綜合趨勢)
-                    prompt = `
+                `;
+            } else {
+                prompt = `
 請針對以下【歷年發展趨勢 - 綜合趨勢】數據進行深度分析，診斷本校系品牌吸引力與錄取門檻的關聯性：
 
 分析對象：${targetName}
@@ -507,16 +625,16 @@ ${trendRows.join('\n')}
 1. 品牌吸引力與錄取門檻的背離診斷：本校的 R-Score 與 平均分數 在過去三年是呈現「健康同步增長」，還是出現背離？例如：「錄取分數上升，但 R-Score 下滑（招生門檻虛胖，實際品牌吸引力在萎縮）」或「R-Score 上升，但錄取分數未跟上（品牌聲譽良好，但篩選或計分機制未能成功篩選高分考生）」。
 2. 與主要對手的消長對比：綜合兩項指標，我們相較於這幾所對手，是在擴大領先、被逐漸追上，還是已經被超越？
 3. 校方具體政策建議：根據本校的吸引力與分數趨勢，校方應如何調整入學篩選權重？或是加強行銷宣傳？請以條列方式提出具體戰略。
-                    `;
-                }
-            } else if (activeTab === 'health') {
-                const healthItems = [];
-                healthData.forEach(item => {
-                    const isSelf = item.name.includes(targetName.split(' ')[0]) || item.name.includes(targetName);
-                    healthItems.push(`- **${item.name}** ${isSelf ? '(本校)' : '(對手)'}: 報到率 = ${item.yield_rate}% | 正取有效性 = ${item.zheng_effect}% | 流失/空缺比例 = ${item.flow_rate}%`);
-                });
+                `;
+            }
+        } else if (tabId === 'health') {
+            const healthItems = [];
+            healthData.forEach(item => {
+                const isSelf = item.name.includes(targetName.split(' ')[0]) || item.name.includes(targetName);
+                healthItems.push(`- **${item.name}** ${isSelf ? '(本校)' : '(對手)'}: 報到率 = ${item.yield_rate}% | 正取有效性 = ${item.zheng_effect}% | 流失/空缺比例 = ${item.flow_rate}%`);
+            });
 
-                prompt = `
+            prompt = `
 請針對以下 113 學年度【招生效益】數據進行分析：
 
 分析對象（與主要重榜競爭對手）：
@@ -531,26 +649,42 @@ ${healthItems.join('\n')}
 1. 招生健康度診斷：本校的招生是屬於「高效穩定型」（正取就讀率高，報到率高）還是「備取依賴型」（正取流失極高，靠備取補滿）？這種狀態對系所的二階甄試（如面試、書審）有何實質影響？
 2. 競爭效益對比：與主要競爭對手相比，我們的正取有效性與報到率如何？我們在轉換率上輸在或贏在哪裡？
 3. 校方應對建議：招生名額分配與正備取倍率應如何進行戰略微調？例如是否應該拉大備取名額，或者調整面試分數篩選出忠誠學生？
-                `;
-            } else if (activeTab === 'quadrant') {
-                // Determine current quadrant
-                const rScorePrData = calculatePercentileRank(rankings, 'r_score', 'r_score_pr');
-                const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
-                const selfPr = bothPrData.find(item => item.id === selectedDept);
+            `;
+        } else if (tabId === 'quadrant') {
+            // Helper function for calculations
+            const calculatePercentileRank = (data, field, targetField) => {
+                const values = data.map(d => d[field]).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
+                return data.map(d => ({
+                    ...d,
+                    [targetField]: d[field] === null || d[field] === undefined ? null : 
+                        Math.round((values.indexOf(d[field]) / (values.length - 1)) * 100)
+                }));
+            };
+            const calculateAverageScorePercentileRank = (data, field, targetField, dimension) => {
+                const values = data.map(d => d[field]).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
+                return data.map(d => ({
+                    ...d,
+                    [targetField]: d[field] === null || d[field] === undefined ? null : 
+                        Math.round((values.indexOf(d[field]) / (values.length - 1)) * 100)
+                }));
+            };
 
-                const currentRPr = selfPr?.r_score_pr !== null ? selfPr.r_score_pr : 'N/A';
-                const currentAPr = selfPr?.avg_score_pr !== null ? selfPr.avg_score_pr : 'N/A';
-                const currentZheng = currentDeptInfo?.zheng_effect !== undefined ? (currentDeptInfo.zheng_effect * 100).toFixed(1) : 'N/A';
-                const currentYield = currentDeptInfo?.yield_rate !== undefined ? (currentDeptInfo.yield_rate * 100).toFixed(1) : 'N/A';
+            const rScorePrData = calculatePercentileRank(rankings, 'r_score', 'r_score_pr');
+            const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
+            const selfPr = bothPrData.find(item => item.id === selectedDept);
 
-                // Fetch historical path from historicalData
-                const pathPoints = [];
-                historicalData.forEach(yrData => {
-                    pathPoints.push(`- **${yrData.name}**: R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
-                });
+            const currentRPr = selfPr?.r_score_pr !== null ? selfPr.r_score_pr : 'N/A';
+            const currentAPr = selfPr?.avg_score_pr !== null ? selfPr.avg_score_pr : 'N/A';
+            const currentZheng = currentDeptInfo?.zheng_effect !== undefined ? (currentDeptInfo.zheng_effect * 100).toFixed(1) : 'N/A';
+            const currentYield = currentDeptInfo?.yield_rate !== undefined ? (currentDeptInfo.yield_rate * 100).toFixed(1) : 'N/A';
 
-                if (quadrantMode === 'effect_yield') {
-                    prompt = `
+            const pathPoints = [];
+            historicalData.forEach(yrData => {
+                pathPoints.push(`- **${yrData.name}**: R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
+            });
+
+            if (qMode === 'effect_yield') {
+                prompt = `
 請針對以下【四象限落點定位 - 招生效益落點】數據進行深度分析，診斷本校系的正備取招生轉換效益：
 
 分析對象：${targetName}
@@ -572,9 +706,9 @@ ${healthItems.join('\n')}
 3. 校方具體應對建議：
    - 應如何科學地調整正備取名額比例與備取倍率？
    - 在甄試面試設計、聯絡正備取生以及宣傳策略上，應採取什麼行動來提高正取就讀率或確保備取遞補成功？請以條列方式提出具體操作建議。
-                    `;
-                } else {
-                    prompt = `
+                `;
+            } else {
+                prompt = `
 請針對以下【四象限落點定位與歷年移動軌跡】數據進行深度分析，診斷本校系品牌競爭力落點與歷年消長：
 
 分析對象：${targetName}
@@ -597,23 +731,22 @@ ${pathPoints.join('\n')}
 1. 當前定位診斷：本校/系目前處於哪一個象限？是否面臨「高分備胎化」或「雙低弱勢」的風險？
 2. 軌跡移動趨勢分析：歷年分數與 R-Score 是呈健康成長，還是在競爭力上面臨衰退？
 3. 校方應對建議：校方應該採取什麼策略，將定位軌跡拉回或引導至「強勢落點型」？請以條列方式提出具體戰略建議。
-                    `;
-                }
-            } else if (activeTab === 'timeline') {
-                const timelinePoints = [];
+                `;
+            }
+        } else if (tabId === 'timeline') {
+            const timelinePoints = [];
+            timelineRankData.forEach((data) => {
+                const ranks = data.ranks || {};
+                const totalCount = data.totalCount || 0;
+                const currId = data.selectedDeptId || selectedDept;
+                const currRank = ranks[currId];
+                const pr = currRank ? Math.round((1 - (currRank - 1) / totalCount) * 100) : 'N/A';
+                
+                timelinePoints.push(`- **${data.year}**:`);
+                timelinePoints.push(`  - 本校排名: ${currRank || 'N/A'} / 總競爭數 ${totalCount} (PR ${pr})`);
+            });
 
-                timelineRankData.forEach((data) => {
-                    const ranks = data.ranks || {};
-                    const totalCount = data.totalCount || 0;
-                    const currId = data.selectedDeptId || selectedDept;
-                    const currRank = ranks[currId];
-                    const pr = currRank ? Math.round((1 - (currRank - 1) / totalCount) * 100) : 'N/A';
-
-                    timelinePoints.push(`- **${data.year}**:`);
-                    timelinePoints.push(`  - 本校排名: ${currRank || 'N/A'} / 總競爭數 ${totalCount} (PR ${pr})`);
-                });
-
-                prompt = `
+            prompt = `
 請針對以下【競爭時間軸與重榜競爭群體演進】數據進行分析：
 
 分析對象：${targetName}
@@ -629,12 +762,6 @@ ${timelinePoints.join('\n')}
 1. 自身實力消長：在核心競爭圈內，我們的名次與 PR 歷年來是上升還是下滑？這反映了什麼 brand 定位危機或機會？
 2. 競爭格局演變：我們在競爭圈中的主導權有何變化？
 3. 校方應對建議：校方應如何調配行銷資源，以防堵新舊競爭對手的包夾，並穩固領先地位？
-                `;
-            } else if (activeTab === 'flow') {
-                const outflowDetails = [];
-                const inflowDetails = [];
-
-                graphData.edges.forEach(edge => {
                     if (edge.from === edge.to) return;
                     if (edge.drawn) return;
                     const fromName = rankings.find(r => r.id === edge.from)?.name.replace(/\n/g, ' ') || edge.from;
