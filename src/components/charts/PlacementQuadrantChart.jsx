@@ -297,6 +297,8 @@ const CustomTooltip = ({ active, payload, selectedDept, mode }) => {
 // --- Main Component ---
 
 const PlacementQuadrantChart = ({
+    mode: propsMode,
+    setMode: propsSetMode,
     rankings,
     selectedDept,
     selectedDimension,
@@ -307,7 +309,9 @@ const PlacementQuadrantChart = ({
     trendDepts
 }) => {
     // Mode switcher: 'rscore_avg' (R-score PR vs Avg Score PR) or 'effect_yield' (Zheng effect vs Yield rate)
-    const [mode, setMode] = useState('rscore_avg');
+    const [localMode, setLocalMode] = useState('rscore_avg');
+    const mode = propsMode !== undefined ? propsMode : localMode;
+    const setMode = propsSetMode !== undefined ? propsSetMode : setLocalMode;
     const [historicalPathRaw, setHistoricalPathRaw] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
 

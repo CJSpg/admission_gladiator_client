@@ -24,8 +24,10 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const TrendChart = ({ currentDeptInfo, historicalData, singleRScoreTicks, singleAvgTicks, rScoreTicks, avgTicks, trendDepts, selectedDept, myLabel }) => {
-    const [trendType, setTrendType] = useState('rscore_avgscore');
+const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType, currentDeptInfo, historicalData, singleRScoreTicks, singleAvgTicks, rScoreTicks, avgTicks, trendDepts, selectedDept, myLabel }) => {
+    const [localTrendType, setLocalTrendType] = useState('rscore_avgscore');
+    const trendType = propsTrendType !== undefined ? propsTrendType : localTrendType;
+    const setTrendType = propsSetTrendType !== undefined ? propsSetTrendType : setLocalTrendType;
     const [hiddenLines, setHiddenLines] = useState([]);
 
     // 💡 自動優化邏輯：當競爭對手改變時，預設只顯示前 5 名（不包含當前校系）

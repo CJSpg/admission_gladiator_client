@@ -669,6 +669,7 @@ thead {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   padding: 24px;
   transition: all 0.3s ease;
+  text-align: left; /* 強制左對齊，防範從父容器繼承置中對齊 */
 }
 
 .ai-analysis-card:hover {
@@ -785,6 +786,7 @@ thead {
   font-size: 14px;
   line-height: 1.6;
   color: #334155;
+  text-align: left;
 }
 
 .ai-markdown-content h1,
@@ -793,6 +795,7 @@ thead {
   color: #1e293b;
   margin-top: 20px;
   margin-bottom: 10px;
+  text-align: left;
 }
 
 .ai-markdown-content h4 {
@@ -801,11 +804,13 @@ thead {
   margin-top: 16px;
   margin-bottom: 8px;
   font-weight: 700;
+  text-align: left;
 }
 
 .ai-markdown-content p {
   margin-top: 0;
   margin-bottom: 12px;
+  text-align: left;
 }
 
 .ai-markdown-content ul,
@@ -813,10 +818,12 @@ thead {
   margin-top: 0;
   margin-bottom: 12px;
   padding-left: 20px;
+  text-align: left;
 }
 
 .ai-markdown-content li {
   margin-bottom: 6px;
+  text-align: left;
 }
 
 /* 戰略建議特色高亮區塊 */
@@ -827,6 +834,7 @@ thead {
   border-radius: 0 8px 8px 0;
   margin-top: 18px;
   margin-bottom: 10px;
+  text-align: left;
 }
 
 .ai-recommendation-box h4 {
@@ -836,12 +844,14 @@ thead {
   display: flex;
   align-items: center;
   gap: 6px;
+  text-align: left;
 }
 
 .ai-recommendation-box p,
 .ai-recommendation-box li {
   color: #1e3a8a;
   font-size: 13.5px;
+  text-align: left;
 }
 
 /* 錯誤提示區塊 */
@@ -853,10 +863,65 @@ thead {
   color: #991b1b;
   font-size: 13.5px;
   margin-top: 10px;
+  text-align: left;
 }
 
 .ai-error-box h4 {
   color: #7f1d1d;
   margin-top: 0;
   margin-bottom: 6px;
+  text-align: left;
+}
+
+/* AI Markdown 表格樣式 */
+.ai-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin: 18px 0;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.ai-markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.ai-markdown-table th {
+  background-color: #f8fafc;
+  color: #334155;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.ai-markdown-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.ai-markdown-table tr:last-child td {
+  border-bottom: none;
+}
+
+.ai-markdown-table tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+.ai-markdown-table tr:hover {
+  background-color: #f1f5f9;
+}
+
+/* AI Markdown 水平線樣式 */
+.ai-markdown-hr {
+  border: 0;
+  height: 1px;
+  background: linear-gradient(to right, #e2e8f0, rgba(226, 232, 240, 0.2));
+  margin: 24px 0;
 }

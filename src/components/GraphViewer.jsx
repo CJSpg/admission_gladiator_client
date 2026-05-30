@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHistoricalData } from '../hooks/useHistoricalData';
 
 // 引入我們剛做好的三大子圖表
@@ -12,6 +12,14 @@ import AIAnalysisPanel from './AIAnalysisPanel';
 
 const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimension, currentYear }) => {
     const [activeTab, setActiveTab] = useState('network');
+    const [trendType, setTrendType] = useState('rscore_avgscore');
+    const [quadrantMode, setQuadrantMode] = useState('rscore_avg');
+
+    // 當切換圖表分頁或點選其他校系時，將子分頁狀態重設回預設值
+    useEffect(() => {
+        setTrendType('rscore_avgscore');
+        setQuadrantMode('rscore_avg');
+    }, [activeTab, selectedDept]);
 
     // 把資料算好
     const {
@@ -67,6 +75,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                         {/* 子元件 2：趨勢圖 */}
                         {activeTab === 'trend' && (
                             <TrendChart
+                                trendType={trendType}
+                                setTrendType={setTrendType}
                                 historicalData={historicalData}
                                 trendDepts={trendDepts}
                                 selectedDept={selectedDept}
@@ -88,6 +98,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                         {/* 子元件：校系軌跡圖 */}
                         {activeTab === 'quadrant' && (
                             <PlacementQuadrantChart
+                                mode={quadrantMode}
+                                setMode={setQuadrantMode}
                                 rankings={rankings}
                                 selectedDept={selectedDept}
                                 selectedDimension={selectedDimension}
@@ -121,6 +133,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                         {/* AI 招生決策診斷面板 */}
                         <AIAnalysisPanel
                             activeTab={activeTab}
+                            trendType={trendType}
+                            quadrantMode={quadrantMode}
                             selectedDept={selectedDept}
                             selectedDimension={selectedDimension}
                             rankings={rankings}

@@ -79,9 +79,9 @@ const calculateAverageScorePercentileRank = (data, key, outputKey, dimension) =>
         groups[grp].forEach((g, idx) => {
             result[g.index][outputKey] = rankedGroupItems[idx][outputKey];
         });
-  });
+    });
 
-  return result;
+    return result;
 };
 
 // --- Simple Markdown Renderer Component ---
@@ -97,10 +97,19 @@ const SimpleMarkdown = ({ text }) => {
     let boxContent = [];
     let keyIdx = 0;
 
+    // Table state variables
+    let isInsideTable = false;
+    let tableHeader = null;
+    let tableRows = [];
+
     const flushList = () => {
         if (listItems.length > 0) {
             const Tag = listType === 'ol' ? 'ol' : 'ul';
-            elements.push(<Tag key={`list-${keyIdx++}`}>{listItems}</Tag>);
+            if (isInsideBox) {
+                boxContent.push(<Tag key={`list-${keyIdx++}`}>{listItems}</Tag>);
+            } else {
+                elements.push(<Tag key={`list-${keyIdx++}`}>{listItems}</Tag>);
+            }
             listItems = [];
         }
         isInsideList = false;
@@ -118,6 +127,47 @@ const SimpleMarkdown = ({ text }) => {
             boxContent = [];
         }
         isInsideBox = false;
+    };
+
+    const flushTable = () => {
+        if (isInsideTable) {
+            if (tableHeader || tableRows.length > 0) {
+                const tableEl = (
+                    <div className="ai-table-wrapper" key={`table-wrapper-${keyIdx++}`}>
+                        <table className="ai-markdown-table">
+                            {tableHeader && (
+                                <thead>
+                                    <tr>
+                                        {tableHeader.map((cell, idx) => (
+                                            <th key={`th-${idx}`}>{cell}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                            )}
+                            {tableRows.length > 0 && (
+                                <tbody>
+                                    {tableRows.map((row, rowIdx) => (
+                                        <tr key={`tr-${rowIdx}`}>
+                                            {row.map((cell, colIdx) => (
+                                                <td key={`td-${colIdx}`}>{cell}</td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            )}
+                        </table>
+                    </div>
+                );
+                if (isInsideBox) {
+                    boxContent.push(tableEl);
+                } else {
+                    elements.push(tableEl);
+                }
+            }
+            isInsideTable = false;
+            tableHeader = null;
+            tableRows = [];
+        }
     };
 
     const parseInlineStyles = (str) => {
@@ -146,10 +196,39 @@ const SimpleMarkdown = ({ text }) => {
     lines.forEach((line) => {
         const trimmed = line.trim();
 
-        // 1. Detect Strategic Advice Highlighting Box
+        // 1. Detect and parse Table Rows
+        const isTableRow = trimmed.startsWith('|');
+        if (isTableRow) {
+            flushList(); // if inside list, close it
+
+            const isSeparator = /^\|[\s\-:|]+$/g.test(trimmed) && trimmed.includes('-');
+            if (!isSeparator) {
+                if (!isInsideTable) {
+                    isInsideTable = true;
+                    tableHeader = null;
+                    tableRows = [];
+                }
+
+                let cleanedLine = trimmed;
+                if (cleanedLine.startsWith('|')) cleanedLine = cleanedLine.slice(1);
+                if (cleanedLine.endsWith('|')) cleanedLine = cleanedLine.slice(0, -1);
+                const cols = cleanedLine.split('|').map(c => parseInlineStyles(c.trim()));
+
+                if (tableHeader === null) {
+                    tableHeader = cols;
+                } else {
+                    tableRows.push(cols);
+                }
+            }
+            return;
+        } else {
+            flushTable(); // if inside table, close it
+        }
+
+        // 2. Detect Strategic Advice Highlighting Box
         // If line is a box header or starts with specific characters, trigger box mode
-        if (trimmed.startsWith('### 校方應對建議') || 
-            trimmed.startsWith('### 校方具體建議') || 
+        if (trimmed.startsWith('### 校方應對建議') ||
+            trimmed.startsWith('### 校方具體建議') ||
             trimmed.startsWith('### 量化招生與宣傳政策建議') ||
             trimmed.startsWith('💡 校方戰略建議') ||
             trimmed.startsWith('### 3. 校方應對建議') ||
@@ -169,8 +248,15 @@ const SimpleMarkdown = ({ text }) => {
             flushBox();
         }
 
-        // 2. Headings
-        if (trimmed.startsWith('# ')) {
+        // 3. Horizontal Rules
+        if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+            flushList();
+            const hrEl = <hr className="ai-markdown-hr" key={`hr-${keyIdx++}`} />;
+            if (isInsideBox) boxContent.push(hrEl);
+            else elements.push(hrEl);
+        }
+        // 4. Headings
+        else if (trimmed.startsWith('# ')) {
             flushList();
             const content = parseInlineStyles(trimmed.slice(2));
             if (isInsideBox) boxContent.push(<h2 key={`h2-${keyIdx++}`}>{content}</h2>);
@@ -190,8 +276,8 @@ const SimpleMarkdown = ({ text }) => {
             const content = parseInlineStyles(trimmed.slice(5));
             if (isInsideBox) boxContent.push(<h4 key={`h4-${keyIdx++}`}>{content}</h4>);
             else elements.push(<h4 key={`h4-${keyIdx++}`}>{content}</h4>);
-        } 
-        // 3. Bullet list items
+        }
+        // 5. Bullet list items
         else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
             if (!isInsideList || listType !== 'ul') {
                 flushList();
@@ -200,8 +286,8 @@ const SimpleMarkdown = ({ text }) => {
             }
             const content = parseInlineStyles(trimmed.slice(2));
             listItems.push(<li key={`li-${keyIdx++}`}>{content}</li>);
-        } 
-        // 4. Numbered list items
+        }
+        // 6. Numbered list items
         else if (/^\d+\.\s/.test(trimmed)) {
             if (!isInsideList || listType !== 'ol') {
                 flushList();
@@ -210,12 +296,12 @@ const SimpleMarkdown = ({ text }) => {
             }
             const content = parseInlineStyles(trimmed.replace(/^\d+\.\s/, ''));
             listItems.push(<li key={`li-${keyIdx++}`}>{content}</li>);
-        } 
-        // 5. Empty lines
+        }
+        // 7. Empty lines
         else if (trimmed === '') {
             flushList();
-        } 
-        // 6. Regular paragraphs
+        }
+        // 8. Regular paragraphs
         else {
             flushList();
             const content = parseInlineStyles(trimmed);
@@ -228,6 +314,7 @@ const SimpleMarkdown = ({ text }) => {
     });
 
     flushList();
+    flushTable();
     flushBox();
 
     return <div className="ai-markdown-content">{elements}</div>;
@@ -236,6 +323,8 @@ const SimpleMarkdown = ({ text }) => {
 // --- Main Panel Component ---
 const AIAnalysisPanel = ({
     activeTab,
+    trendType = 'rscore_avgscore',
+    quadrantMode = 'rscore_avg',
     selectedDept,
     selectedDimension,
     rankings,
@@ -253,14 +342,16 @@ const AIAnalysisPanel = ({
     const [error, setError] = useState('');
 
     // In-memory cache ref to avoid hitting GPU on tab switches
-    // Key format: `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}`
+    // Key format: `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}_${trendType}_${quadrantMode}`
     const cacheRef = useRef({});
 
     useEffect(() => {
         if (!selectedDept || !activeTab) return;
 
-        const cacheKey = `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}`;
-        
+        const cacheKey = `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}` +
+            (activeTab === 'trend' ? `_${trendType}` : '') +
+            (activeTab === 'quadrant' ? `_${quadrantMode}` : '');
+
         // 1. Check Cache
         if (cacheRef.current[cacheKey]) {
             setAnalysis(cacheRef.current[cacheKey]);
@@ -271,7 +362,7 @@ const AIAnalysisPanel = ({
 
         // 2. Fetch AI Analysis
         fetchAIAnalysis(cacheKey);
-    }, [selectedDept, activeTab, selectedDimension, currentYear]);
+    }, [selectedDept, activeTab, selectedDimension, currentYear, trendType, quadrantMode]);
 
     const fetchAIAnalysis = async (cacheKey) => {
         setIsLoading(true);
@@ -282,7 +373,8 @@ const AIAnalysisPanel = ({
         const dimensionText = selectedDimension === 'school' ? '學校' : selectedDimension === 'group' ? '系組' : '科系';
 
         // Choose prompt and content based on activeTab
-        let systemPrompt = "你是一個高階教育校務研究與招生戰略分析專家。請只使用正體中文（繁體中文）回答問題。";
+        // System Prompt strictly forbids conversational preamble to resolve user issues with "好的，身為專家..."
+        let systemPrompt = "你是一個高階教育校務研究與招生戰略分析專家。請只使用正體中文（繁體中文）回答問題。請直接輸出分析結果（直接從大標題或第一段診斷內容開始），絕對不能包含任何社交寒暄、客套話、前言、開場白（例如「好的，我將為您分析...」、「身為分析專家，我將針對...」等）以及結語，直奔分析主題。";
         let prompt = "";
 
         try {
@@ -351,8 +443,7 @@ ${draws.length > 0 ? draws.join('\n') : '- 無顯著平手交集數據'}
                     .slice(0, 3)
                     .map(c => c.id);
 
-                // Fetch rankings for each year (asynchronously or reading from memory)
-                // Note: historicalData is already compiled by the parent hook!
+                // Fetch rankings for each year
                 historicalData.forEach(yrData => {
                     trendRows.push(`- **${yrData.name}** (本校): R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
                     topCompetitors.forEach(compId => {
@@ -361,22 +452,57 @@ ${draws.length > 0 ? draws.join('\n') : '- 無顯著平手交集數據'}
                     });
                 });
 
-                prompt = `
-請針對以下【歷年發展趨勢】數據進行分析：
+                if (trendType === 'rscore') {
+                    prompt = `
+請針對以下【歷年發展趨勢 - R-Score 競爭力趨勢】數據進行深度分析，診斷本校系 brand 強度的演進：
 
 分析對象：${targetName}
 歷年比較數據（包含主要重榜競爭對手）：
 ${trendRows.join('\n')}
 
 數據背景：
-- **R-Score**：基於重榜決鬥勝率的品牌強度指標。能有效排除考科難易度、計分權重等偏差。R-Score 越小代表競爭力越強（或越大，視公式而定。此專案中 R-Score 越高代表吸引力越強）。
-- **平均分數**：學生入學考試的分數品質（學測/統測錄取分數門檻）。
+- **R-Score**：基於重榜決鬥勝率的品牌強度指標。R-Score 越高代表吸引力越強，代表當考生同時錄取本校與對手時，更多人選擇本校。
 
 請幫校方進行以下「圖表細節分析」並給予建議：
-1. 品牌吸引力與錄取門檻的背離診斷：本校的 R-Score 與 平均分數 在過去三年是呈現「健康同步增長」，還是出現背離？例如：「錄取分數上升，但 R-Score 下滑（招生門檻虛胖，實際吸引力在萎縮）」或「R-Score 上升，但錄取分數未跟上（品牌聲譽良好，但考科篩選機制失效）」。
-2. 與主要對手的消長對比：在 R-Score 和平均錄取分數的拉鋸中，我們相較於這幾所對手，是在擴大領先、被逐漸追上，還是已經被超越？
-3. 校方具體政策建議：根據趨勢，校方應如何調整入學篩選權重？或是加強行銷宣傳？
-                `;
+1. 本校品牌吸引力變遷：過去三年，本校的 R-Score 呈現上升、持平還是下降趨勢？這反映了本校在招生市場上的品牌形象發生了何種變化？
+2. 與競爭對手的 R-Score 消長對比：與主要競爭對手相比，我們的品牌吸引力優勢是否在流失？是否有特定的對手 R-Score 快速崛起，對我們構成直接威脅？
+3. 校方品牌強化建議：針對品牌吸引力的消長，校方應該如何在宣傳、系所定位、產學合作或就業宣傳上進行戰略強化，以提升重榜考生的選擇率？請以條列方式提出具體操作建議。
+                    `;
+                } else if (trendType === 'avgscore') {
+                    prompt = `
+請針對以下【歷年發展趨勢 - 錄取分數門檻趨勢】數據進行深度分析，診斷錄取生源素質的演進：
+
+分析對象：${targetName}
+歷年比較數據（包含主要重榜競爭對手）：
+${trendRows.join('\n')}
+
+數據背景：
+- **平均分數**：學生入學考試的分數品質（學測/統測錄取分數門檻）。代表錄取學生的考生成績水準。
+
+請幫校方進行以下「圖表細節分析」並給予建議：
+1. 錄取門檻走勢診斷：過去三年，本校的平均分數門檻是上升、持平還是下滑？這反映了生源素質的何種演變趨勢？
+2. 與主要對手的門檻差距消長：在錄取分數門檻上，我們與主要對手的差距是在拉大還是縮小？我們處於領先還是落後？
+3. 篩選機制調整建議：根據錄取門檻趨勢，校方在二階甄試的考科篩選、加權倍率或是名額配置上，該如何進行微調以確保錄取生源水準，或防止因分數崩盤導致的口碑下滑？請以條列方式提出具體政策建議。
+                    `;
+                } else {
+                    // 預設為 'rscore_avgscore' (綜合趨勢)
+                    prompt = `
+請針對以下【歷年發展趨勢 - 綜合趨勢】數據進行深度分析，診斷本校系品牌吸引力與錄取門檻的關聯性：
+
+分析對象：${targetName}
+歷年比較數據（包含主要重榜競爭對手）：
+${trendRows.join('\n')}
+
+數據背景：
+- **R-Score**：基於重榜決鬥勝率的品牌強度指標（吸引力指標），分值越高代表本校系對學生的品牌吸引力越強。
+- **平均分數**：錄取考生的學術考試成績門檻，代表考生的入學成績品質。
+
+請幫校方進行以下「圖表細節分析」並給予建議：
+1. 品牌吸引力與錄取門檻的背離診斷：本校的 R-Score 與 平均分數 在過去三年是呈現「健康同步增長」，還是出現背離？例如：「錄取分數上升，但 R-Score 下滑（招生門檻虛胖，實際品牌吸引力在萎縮）」或「R-Score 上升，但錄取分數未跟上（品牌聲譽良好，但篩選或計分機制未能成功篩選高分考生）」。
+2. 與主要對手的消長對比：綜合兩項指標，我們相較於這幾所對手，是在擴大領先、被逐漸追上，還是已經被超越？
+3. 校方具體政策建議：根據本校的吸引力與分數趨勢，校方應如何調整入學篩選權重？或是加強行銷宣傳？請以條列方式提出具體戰略。
+                    `;
+                }
             } else if (activeTab === 'health') {
                 const healthItems = [];
                 healthData.forEach(item => {
@@ -417,8 +543,33 @@ ${healthItems.join('\n')}
                     pathPoints.push(`- **${yrData.name}**: R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
                 });
 
-                prompt = `
-請針對以下【四象限落點定位與歷年移動軌跡】數據進行分析：
+                if (quadrantMode === 'effect_yield') {
+                    prompt = `
+請針對以下【四象限落點定位 - 招生效益落點】數據進行深度分析，診斷本校系的正備取招生轉換效益：
+
+分析對象：${targetName}
+維度：${dimensionText} 層級
+
+招生效益核心指標（113學年）：
+- **正取有效性（正取生登記就讀率）**: ${currentZheng}% (中位數一般為 50%)
+- **報到率（最終入學人數佔名額比例）**: ${currentYield}% (滿額為 100%)
+
+象限類型定義：
+1. 【高忠誠熱門型】(正取有效性 >= 50%, 報到率 >= 100%)：代表第一志願學生多，且名額全數招滿。品牌認同度極高。
+2. 【高保底穩健型】(正取有效性 < 50%, 報到率 >= 100%)：正取生大多流失，但靠著備取生遞補順利招滿。屬於「備胎依賴型」，招生安全，但需花費大量心力進行二階甄試與遞補。
+3. 【危險流失型】(正取有效性 < 50%, 報到率 < 100%)：正取流失嚴重，且備取不足或學生放棄，最終產生招生缺額。
+4. 【高忠誠缺額型】(正取有效性 >= 50%, 報到率 < 100%)：正取就讀意願高，但可能因備取設定過少或名額配置問題而未招滿。
+
+請幫校方進行以下「圖表細節分析」並給予建議：
+1. 當前招生狀態定位：本校/系目前處於哪一個招生效益象限？是否存在過度依賴備取生（高保底穩健型）或面臨招生名額未滿（缺額流失）的風險？
+2. 二階甄試篩選機制診斷：正取有效性高低代表了什麼？校方在面試或書審階段，是否未能有效甄別考生的「就讀忠誠度」，導致正取考生重複錄取其他名校而大量流失？
+3. 校方具體應對建議：
+   - 應如何科學地調整正備取名額比例與備取倍率？
+   - 在甄試面試設計、聯絡正備取生以及宣傳策略上，應採取什麼行動來提高正取就讀率或確保備取遞補成功？請以條列方式提出具體操作建議。
+                    `;
+                } else {
+                    prompt = `
+請針對以下【四象限落點定位與歷年移動軌跡】數據進行深度分析，診斷本校系品牌競爭力落點與歷年消長：
 
 分析對象：${targetName}
 維度：${dimensionText} 層級
@@ -426,8 +577,6 @@ ${healthItems.join('\n')}
 四象限定位標準（113學年）：
 - **R-Score PR（品牌競爭百分等級）**: ${currentRPr} (中位數為 50)
 - **平均分數 PR（考生成績百分等級）**: ${currentAPr} (中位數為 50)
-- **正取有效性（正取生登記率）**: ${currentZheng}% 
-- **報到率**: ${currentYield}%
 
 歷年分數與實力消長路徑：
 ${pathPoints.join('\n')}
@@ -441,18 +590,19 @@ ${pathPoints.join('\n')}
 請幫校方進行以下「圖表細節分析」並給予建議：
 1. 當前定位診斷：本校/系目前處於哪一個象限？是否面臨「高分備胎化」或「雙低弱勢」的風險？
 2. 軌跡移動趨勢分析：歷年分數與 R-Score 是呈健康成長，還是在競爭力上面臨衰退？
-3. 校方應對建議：校方應該採取什麼策略，將定位軌跡拉回或引導至「強勢落點型」？
-                `;
+3. 校方應對建議：校方應該採取什麼策略，將定位軌跡拉回或引導至「強勢落點型」？請以條列方式提出具體戰略建議。
+                    `;
+                }
             } else if (activeTab === 'timeline') {
                 const timelinePoints = [];
-                
+
                 timelineRankData.forEach((data) => {
                     const ranks = data.ranks || {};
                     const totalCount = data.totalCount || 0;
                     const currId = data.selectedDeptId || selectedDept;
                     const currRank = ranks[currId];
                     const pr = currRank ? Math.round((1 - (currRank - 1) / totalCount) * 100) : 'N/A';
-                    
+
                     timelinePoints.push(`- **${data.year}**:`);
                     timelinePoints.push(`  - 本校排名: ${currRank || 'N/A'} / 總競爭數 ${totalCount} (PR ${pr})`);
                 });
@@ -470,7 +620,7 @@ ${timelinePoints.join('\n')}
 時間軸展示了本校系與其他競爭學校「重榜考生交集」的演進。名次與 PR 越高代表在競爭圈中的贏面越大。
 
 請幫校方進行以下「圖表細節分析」並給予建議：
-1. 自身實力消長：在核心競爭圈內，我們的名次與 PR 歷年來是上升還是下滑？這反映了什麼品牌定位危機或機會？
+1. 自身實力消長：在核心競爭圈內，我們的名次與 PR 歷年來是上升還是下滑？這反映了什麼 brand 定位危機或機會？
 2. 競爭格局演變：我們在競爭圈中的主導權有何變化？
 3. 校方應對建議：校方應如何調配行銷資源，以防堵新舊競爭對手的包夾，並穩固領先地位？
                 `;
@@ -491,9 +641,6 @@ ${timelinePoints.join('\n')}
                         inflowDetails.push(`  - 從【${fromName}】流入：${edge.value || 0} 人`);
                     }
                 });
-
-                const totalOut = outflowDetails.length;
-                const totalIn = inflowDetails.length;
 
                 prompt = `
 請針對以下【重榜學生真實流動情報】數據進行分析：
@@ -539,7 +686,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
                         { role: 'user', content: prompt }
                     ],
                     temperature: 0.2,
-                    max_tokens: 1500
+                    max_tokens: 64000
                 })
             });
 
@@ -578,9 +725,14 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
     const getTitleText = () => {
         switch (activeTab) {
             case 'network': return 'AI 競爭關係網深度診斷';
-            case 'trend': return 'AI 歷年品牌趨勢深度解析';
+            case 'trend':
+                if (trendType === 'rscore') return 'AI 歷年品牌強度 (R-Score) 趨勢解析';
+                if (trendType === 'avgscore') return 'AI 歷年錄取分數門檻趨勢解析';
+                return 'AI 歷年品牌與分數綜合趨勢解析';
             case 'health': return 'AI 招生效益與效益診斷';
-            case 'quadrant': return 'AI 校系落點定位軌跡診斷';
+            case 'quadrant':
+                if (quadrantMode === 'effect_yield') return 'AI 正取有效性與報到率落點診斷';
+                return 'AI 校系落點定位與歷年軌跡診斷';
             case 'timeline': return 'AI 競爭時間軸演進解析';
             case 'flow': return 'AI 生源流動與備取策略建議';
             default: return 'AI 智慧招生分析';
