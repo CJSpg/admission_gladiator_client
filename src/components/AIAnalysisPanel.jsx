@@ -457,7 +457,7 @@ const AIAnalysisPanel = ({
             setAnalysis('');
         }
 
-        const fetchPromise = doApiFetch(tabId, tType, qMode);
+        const fetchPromise = doApiFetch(cacheKey, tabId, tType, qMode);
 
         cacheRef.current[cacheKey] = {
             status: 'pending',
@@ -497,7 +497,7 @@ const AIAnalysisPanel = ({
         return fetchPromise;
     };
 
-    const doApiFetch = async (tabId, tType, qMode) => {
+    const doApiFetch = async (cacheKey, tabId, tType, qMode) => {
         try {
             const targetName = currentDeptInfo?.name ? currentDeptInfo.name.replace(/\n/g, ' ') : selectedDept;
         const dimensionText = selectedDimension === 'school' ? '學校' : selectedDimension === 'group' ? '系組' : '科系';
