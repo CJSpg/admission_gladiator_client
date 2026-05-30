@@ -584,7 +584,7 @@ thead {
 /* --- Recharts Charts Wrapper --- */
 .chart-wrapper {
   width: 100%;
-  min-height: 100%;
+  min-height: auto;
   display: flex;
   flex-direction: column;
   background: #fff;

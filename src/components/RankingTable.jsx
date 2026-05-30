@@ -78,7 +78,7 @@ const RankingTable = ({
     }, [rankings, searchTerm, sortConfig]);
 
     return (
-        <div className="leaderboard-section" style={{ flex: '0 0 40%' }}>
+        <div className="leaderboard-section" style={{ flex: '0 0 35%' }}>
             <div className="leaderboard-header-row">
                 <h2>📊 全台校系競爭力總覽</h2>
                 <div className="leaderboard-actions">

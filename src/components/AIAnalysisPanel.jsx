@@ -498,7 +498,8 @@ const AIAnalysisPanel = ({
     };
 
     const doApiFetch = async (tabId, tType, qMode) => {
-        const targetName = currentDeptInfo?.name ? currentDeptInfo.name.replace(/\n/g, ' ') : selectedDept;
+        try {
+            const targetName = currentDeptInfo?.name ? currentDeptInfo.name.replace(/\n/g, ' ') : selectedDept;
         const dimensionText = selectedDimension === 'school' ? '學校' : selectedDimension === 'group' ? '系組' : '科系';
 
         // Choose prompt and content based on tabId
@@ -762,7 +763,14 @@ ${timelinePoints.join('\n')}
 1. 自身實力消長：在核心競爭圈內，我們的名次與 PR 歷年來是上升還是下滑？這反映了什麼 brand 定位危機或機會？
 2. 競爭格局演變：我們在競爭圈中的主導權有何變化？
 3. 校方應對建議：校方應如何調配行銷資源，以防堵新舊競爭對手的包夾，並穩固領先地位？
-                    if (edge.from === edge.to) return;
+            `;
+        } else if (tabId === 'flow') {
+            const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
+            const inflowDetails = [];
+            const outflowDetails = [];
+
+            connectedEdges.forEach(edge => {
+                if (edge.from === edge.to) return;
                     if (edge.drawn) return;
                     const fromName = rankings.find(r => r.id === edge.from)?.name.replace(/\n/g, ' ') || edge.from;
                     const toName = rankings.find(r => r.id === edge.to)?.name.replace(/\n/g, ' ') || edge.to;
@@ -848,6 +856,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
 
             setAnalysis(cleanedText);
             setError('');
+            return cleanedText;
         } catch (err) {
             console.error('vLLM fetch error:', err);
             if (latestCacheKeyRef.current === cacheKey) {

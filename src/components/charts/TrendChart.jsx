@@ -57,7 +57,7 @@ const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType
     };
 
     return (
-        <div className="chart-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="chart-wrapper" style={{ display: 'flex', flexDirection: 'column', height: 'auto' }}>
             {/* 趨勢類型切換 */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' }}>
                 <button onClick={() => setTrendType('rscore_avgscore')} style={{ padding: '8px 20px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', border: trendType === 'rscore_avgscore' ? 'none' : '1px solid #2ecc71', backgroundColor: trendType === 'rscore_avgscore' ? '#2ecc71' : '#fff', color: trendType === 'rscore_avgscore' ? '#fff' : '#2ecc71' }}>📈 綜合趨勢</button>
