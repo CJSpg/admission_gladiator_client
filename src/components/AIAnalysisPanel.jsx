@@ -847,25 +847,10 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
                 .replace(/\\cdot/g, '·');       // 將 \cdot 轉換為 ·
 
             // 檢查是否在此請求回傳期間，使用者已經切換了分頁/校系，若是則直接捨棄此回應 (解決 Race Condition)
-            if (latestCacheKeyRef.current !== cacheKey) {
-                return;
-            }
-
-            // Save to Cache
-            cacheRef.current[cacheKey] = cleanedText;
-
-            setAnalysis(cleanedText);
-            setError('');
             return cleanedText;
         } catch (err) {
             console.error('vLLM fetch error:', err);
-            if (latestCacheKeyRef.current === cacheKey) {
-                setError(`無法從本地 vLLM 伺服器獲取分析結果。請確保您的 Docker 容器已在連接埠 18000 啟動，且模型已載入。 (Error: ${err.message})`);
-            }
-        } finally {
-            if (latestCacheKeyRef.current === cacheKey) {
-                setIsLoading(false);
-            }
+            throw new Error(`無法從本地 vLLM 伺服器獲取分析結果。請確保您的 Docker 容器已在連接埠 18000 啟動，且模型已載入。 (Error: ${err.message})`);
         }
     };
 
