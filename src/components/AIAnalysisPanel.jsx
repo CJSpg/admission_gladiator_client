@@ -518,11 +518,10 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
             }
 
             // Execute the fetch against local vLLM API
-            const response = await fetch('http://localhost:18000/v1/chat/completions', {
+            const response = await fetch('http://127.0.0.1:18000/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer EMPTY'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     model: 'google/gemma-4-E4B-it',
