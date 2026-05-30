@@ -652,3 +652,211 @@ thead {
   color: #c0392b;
   border-color: #e6b0aa;
 }
+
+/* =========================================
+   💡 AI 招生診斷面板樣式 (AI Analysis Panel)
+   ========================================= */
+.ai-analysis-container {
+  margin-top: 20px;
+  width: 100%;
+}
+
+.ai-analysis-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.ai-analysis-card:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.ai-analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px;
+}
+
+.ai-analysis-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.ai-model-badge {
+  background-color: #f1f5f9;
+  color: #64748b;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+}
+
+/* Loading 骨架屏與動畫 */
+.ai-analysis-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-skeleton-title {
+  height: 24px;
+  width: 35%;
+  background: #f1f5f9;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-skeleton-line {
+  height: 16px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-skeleton-line.short {
+  width: 60%;
+}
+
+.ai-skeleton-line.medium {
+  width: 85%;
+}
+
+.ai-skeleton-title::after,
+.ai-skeleton-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: shimmer 1.5s infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.ai-loading-text {
+  color: #64748b;
+  font-size: 13px;
+  margin-top: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.ai-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* AI 輸出 Markdown 解析排版 */
+.ai-markdown-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.ai-markdown-content h1,
+.ai-markdown-content h2,
+.ai-markdown-content h3 {
+  color: #1e293b;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.ai-markdown-content h4 {
+  color: #0f172a;
+  font-size: 14px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.ai-markdown-content p {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.ai-markdown-content ul,
+.ai-markdown-content ol {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding-left: 20px;
+}
+
+.ai-markdown-content li {
+  margin-bottom: 6px;
+}
+
+/* 戰略建議特色高亮區塊 */
+.ai-recommendation-box {
+  background-color: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  padding: 16px 20px;
+  border-radius: 0 8px 8px 0;
+  margin-top: 18px;
+  margin-bottom: 10px;
+}
+
+.ai-recommendation-box h4 {
+  color: #1d4ed8;
+  margin-top: 0;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-recommendation-box p,
+.ai-recommendation-box li {
+  color: #1e3a8a;
+  font-size: 13.5px;
+}
+
+/* 錯誤提示區塊 */
+.ai-error-box {
+  background-color: #fef2f2;
+  border: 1px dashed #fca5a5;
+  padding: 16px;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 13.5px;
+  margin-top: 10px;
+}
+
+.ai-error-box h4 {
+  color: #7f1d1d;
+  margin-top: 0;
+  margin-bottom: 6px;
+}

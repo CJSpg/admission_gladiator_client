@@ -8,6 +8,7 @@ import HealthChart from './charts/HealthChart';
 import CompetitionTimeline from './charts/CompetitionTimeline';
 import FlowTable from './charts/FlowTable';
 import PlacementQuadrantChart from './charts/PlacementQuadrantChart';
+import AIAnalysisPanel from './AIAnalysisPanel';
 
 const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimension, currentYear }) => {
     const [activeTab, setActiveTab] = useState('network');
@@ -116,6 +117,22 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                                 rankings={rankings}
                             />
                         )}
+
+                        {/* AI 招生決策診斷面板 */}
+                        <AIAnalysisPanel
+                            activeTab={activeTab}
+                            selectedDept={selectedDept}
+                            selectedDimension={selectedDimension}
+                            rankings={rankings}
+                            graphData={graphData}
+                            years={years}
+                            currentYear={currentYear}
+                            historicalData={historicalData}
+                            trendDepts={trendDepts}
+                            currentDeptInfo={currentDeptInfo}
+                            healthData={healthData}
+                            timelineRankData={timelineRankData}
+                        />
                     </div>
                 </>
             )}
