@@ -517,10 +517,14 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
                 `;
             }
 
-            // In development mode, use the Vite proxy to bypass CORS and support cross-machine calls.
-            // In production, fallback to direct localhost IP.
-            const isDev = import.meta.env.DEV;
-            const apiUrl = isDev ? '/local-api/v1/chat/completions' : 'http://127.0.0.1:18000/v1/chat/completions';
+            // Dynamically resolve the hostname of the server hosting the app.
+            // This ensures other computers in the network route requests to Computer A (140.130.33.196)
+            // and bypasses Chrome's PNA (Private Network Access) loopback block.
+            let host = window.location.hostname;
+            if (!host || host === 'localhost' || host === '127.0.0.1') {
+                host = '127.0.0.1'; // Local dev fallback
+            }
+            const apiUrl = `http://${host}:18000/v1/chat/completions`;
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
