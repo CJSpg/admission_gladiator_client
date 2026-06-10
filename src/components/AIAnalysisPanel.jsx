@@ -461,6 +461,18 @@ ${trendRows.join('\n')}
 3. 【流入登分比例與錄取分數的聯動效應】：分析流入登分比例是否與錄取分數存在反向聯動？（例如流入登分比例下降，是否帶動錄取分數與相對 PR 上升？若流入登分比例長期偏高，如何導致後續錄取分數被拉低？）。
 4. 【穩定錄取分數與選材優化策略】：校方應如何調控以降低流入登分比例、穩定錄取分數？（如調整考科採計、落點最佳化等）。請以條列方式提出策略建議。
 `;
+                } else if (tType === 'flow_pr') {
+                    prompt = `
+請針對以下歷年【流入登分比例與錄取分數關係 (缺額落點分析)】數據進行深度分析，診斷本${dimensionText}缺額名額流入如何影響分數表現與招生實力：
+
+【分析主體與主要競爭對手歷年 R-Score、平均分數 PR 與流入登分比例數據】
+${trendRows.join('\n')}
+
+請幫校方進行以下「歷年流入登分比例與錄取分數關係診斷」：
+1. 【自身流入登分比例與分數聯動分析】：本${dimensionText}歷年流入登記分發的名額比例（FlowRate，即缺額流入登分比例）有何變化趨勢？當流入登分比例上升時，錄取分數與相對 PR 是否隨之被拉低？而當流入比例下降（代表甄審階段留住更多學生）時，錄取分數與相對 PR 是否有回升？
+2. 【競爭對手流入比例對比診斷】：與主要競爭對手相比，本${dimensionText}的流入登分比例是偏高還是偏低？如果對手的流入名額較少、而本${dimensionText}顯著偏高，這是否是導致本${dimensionText}錄取分數和 PR 排名落後於競爭對手的主要原因之一？
+3. 【甄審階段留才效益與策略建議】：若流入登分比例長期偏高，代表甄審階段的留人效率有待加強。校方應如何優化一階篩選條件（如防止篩到會優先去更強對手的考生）、設計更具就讀忠誠度的選材與備取策略，以實質降低流入比例並穩定後續登記分發分數？請以條列方式提出具體操作建議。
+`;
                 } else {
                     // tType === 'rscore_avgscore'
                     prompt = `
@@ -790,6 +802,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
         const targets = [
             { keySuffix: 'network', tabId: 'network', tType: '', qMode: '' },
             { keySuffix: 'trend_rscore_avgscore', tabId: 'trend', tType: 'rscore_avgscore', qMode: '' },
+            { keySuffix: 'trend_flow_pr', tabId: 'trend', tType: 'flow_pr', qMode: '' },
             { keySuffix: 'trend_rscore', tabId: 'trend', tType: 'rscore', qMode: '' },
             { keySuffix: 'trend_avgscore', tabId: 'trend', tType: 'avgscore', qMode: '' },
             { keySuffix: 'health', tabId: 'health', tType: '', qMode: '' },
@@ -859,7 +872,10 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
     const currentActiveKey = getActiveKey();
     const activeEntry = analysisCache[currentActiveKey];
 
-    const isLoading = !isDataReady || (activeEntry ? activeEntry.status === 'loading' : true);
+    // Optimize isLoading: If we already have a success cached entry, we display it immediately 
+    // instead of showing the skeleton, which prevents the flicker effect during re-rendering/scrolling.
+    const hasAnalysis = activeEntry?.status === 'success';
+    const isLoading = !hasAnalysis && (!isDataReady || (activeEntry ? activeEntry.status === 'loading' : true));
     const error = isDataReady && activeEntry?.status === 'error' ? activeEntry.error : '';
     const analysis = isDataReady && activeEntry?.status === 'success' ? activeEntry.text : '';
 
@@ -881,6 +897,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
             case 'trend':
                 if (trendType === 'rscore') return 'AI 歷年品牌強度 (R-Score) 趨勢解析';
                 if (trendType === 'avgscore') return 'AI 歷年錄取分數門檻趨勢解析';
+                if (trendType === 'flow_pr') return 'AI 歷年缺額流入與錄取分數趨勢解析';
                 return 'AI 歷年品牌與分數綜合趨勢解析';
             case 'health': return 'AI 招生效益與健康度診斷';
             case 'quadrant':
