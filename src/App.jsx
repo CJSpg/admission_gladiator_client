@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import FilterBar from './components/FilterBar';
 import RankingTable from './components/RankingTable';
@@ -11,6 +11,21 @@ function App() {
   const [rankings, setRankings] = useState([]);
   const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
   const [selectedDept, setSelectedDept] = useState(null);
+
+  // 儲存當前選取的科系 ID 與舊的 rankings，供切換年度時比對名稱用
+  const selectedDeptRef = useRef(selectedDept);
+  const rankingsRef = useRef(rankings);
+  const prevDimensionRef = useRef(selectedDimension);
+
+  useEffect(() => {
+    selectedDeptRef.current = selectedDept;
+  }, [selectedDept]);
+
+  useEffect(() => {
+    rankingsRef.current = rankings;
+  }, [rankings]);
+
+  const normalizeName = (name) => (name || "").replace(/\n/g, '').replace(/\s+/g, '').trim();
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}available_years.json`)
@@ -32,13 +47,41 @@ function App() {
   useEffect(() => {
     if (!selectedYear || !selectedDimension) return;
 
+    let isSubscribed = true;
+
     Promise.all([
       fetch(`${import.meta.env.BASE_URL}rankings_${selectedYear}_${selectedDimension}.json`).then(res => res.json()),
       fetch(`${import.meta.env.BASE_URL}graph_${selectedYear}_${selectedDimension}.json`).then(res => res.json())
     ]).then(([rankingData, graphData]) => {
+      if (!isSubscribed) return;
+
+      const currentSelectedDept = selectedDeptRef.current;
+      const currentRankings = rankingsRef.current;
+
+      // 如果有選取校系，且維度沒有改變（代表是切換年度），我們用名稱對齊新的 ID
+      if (currentSelectedDept && prevDimensionRef.current === selectedDimension) {
+        const oldDept = currentRankings.find(r => r.id === currentSelectedDept);
+        if (oldDept) {
+          const oldNormalizedName = normalizeName(oldDept.name);
+          const newDept = rankingData.find(r => normalizeName(r.name) === oldNormalizedName);
+          if (newDept) {
+            setSelectedDept(newDept.id);
+          } else {
+            setSelectedDept(null);
+          }
+        } else {
+          setSelectedDept(null);
+        }
+      }
+
       setRankings(rankingData);
       setGraphData(graphData);
+      prevDimensionRef.current = selectedDimension;
     }).catch(err => console.error(`⚠️ 無法讀取資料`, err));
+
+    return () => {
+      isSubscribed = false;
+    };
   }, [selectedYear, selectedDimension]);
 
   // 當排名資料更新時，檢查原本選取的校系是否在新的資料中依然存在，若不存在則清空
