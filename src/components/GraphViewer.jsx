@@ -15,11 +15,11 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
     const [trendType, setTrendType] = useState('rscore_avgscore');
     const [quadrantMode, setQuadrantMode] = useState('rscore_avg');
 
-    // 當切換圖表分頁或點選其他校系時，將子分頁狀態重設回預設值
+    // 當切換圖表分頁時，將子分頁狀態重設回預設值
     useEffect(() => {
         setTrendType('rscore_avgscore');
         setQuadrantMode('rscore_avg');
-    }, [activeTab, selectedDept]);
+    }, [activeTab]);
 
     // 把資料算好
     const {

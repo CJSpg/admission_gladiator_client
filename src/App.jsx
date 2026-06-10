@@ -23,6 +23,11 @@ function App() {
       });
   }, []);
 
+  // 當維度改變時，清空選取的校系
+  useEffect(() => {
+    setSelectedDept(null);
+  }, [selectedDimension]);
+
   // 當年度或維度改變時，重新抓取對應資料
   useEffect(() => {
     if (!selectedYear || !selectedDimension) return;
@@ -33,9 +38,18 @@ function App() {
     ]).then(([rankingData, graphData]) => {
       setRankings(rankingData);
       setGraphData(graphData);
-      setSelectedDept(null); // 切換年份時清空右側選擇
     }).catch(err => console.error(`⚠️ 無法讀取資料`, err));
   }, [selectedYear, selectedDimension]);
+
+  // 當排名資料更新時，檢查原本選取的校系是否在新的資料中依然存在，若不存在則清空
+  useEffect(() => {
+    if (selectedDept && rankings.length > 0) {
+      const exists = rankings.some(r => r.id === selectedDept);
+      if (!exists) {
+        setSelectedDept(null);
+      }
+    }
+  }, [rankings, selectedDept]);
 
   return (
     <div className="admin-gladiator-dashboard">
