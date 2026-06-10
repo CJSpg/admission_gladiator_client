@@ -226,7 +226,6 @@ const SimpleMarkdown = ({ text }) => {
         }
 
         // 2. Detect Strategic Advice Highlighting Box
-        // If line is a box header or starts with specific characters, trigger box mode
         if (trimmed.startsWith('### 校方應對建議') ||
             trimmed.startsWith('### 校方具體建議') ||
             trimmed.startsWith('### 量化招生與宣傳政策建議') ||
@@ -240,10 +239,10 @@ const SimpleMarkdown = ({ text }) => {
             flushList();
             flushBox();
             isInsideBox = true;
-            return; // Skip rendering this header as a normal header, we render custom box header instead
+            return;
         }
 
-        // Check if box should be closed (a new major heading starts and we are in a box)
+        // Check if box should be closed
         if (isInsideBox && (trimmed.startsWith('## ') || (trimmed.startsWith('### ') && !trimmed.includes('建議')))) {
             flushBox();
         }
@@ -337,361 +336,218 @@ const AIAnalysisPanel = ({
     healthData,
     timelineRankData
 }) => {
-    const [analysis, setAnalysis] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [analysisCache, setAnalysisCache] = useState({});
+    const analysisCacheRef = useRef({});
+    const firedPrefixRef = useRef('');
 
-    // 用於追蹤最新的請求鍵，防止異步請求回傳時覆蓋新分頁的狀態 (Race Condition)
-    const latestCacheKeyRef = useRef('');
+    // Define isDataReady variable to check if necessary data exists before query execution
+    const isDataReady = !!(
+        rankings && rankings.length > 0 && 
+        graphData && graphData.edges && 
+        historicalData && historicalData.length > 0
+    );
 
-    // In-memory cache ref to avoid hitting GPU on tab switches
-    // Key format: `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}_${trendType}_${quadrantMode}`
-    // cacheRef.current[cacheKey] = { status: 'success'|'pending'|'error', data: string, error: string, promise: Promise }
-    const cacheRef = useRef({});
-
+    // Keep ref in sync with state
     useEffect(() => {
-        if (!selectedDept || !activeTab) return;
-
-        let isCurrent = true;
-
-        const currentActiveKey = `${currentYear}_${selectedDimension}_${selectedDept}_${activeTab}` +
-            (activeTab === 'trend' ? `_${trendType}` : '') +
-            (activeTab === 'quadrant' ? `_${quadrantMode}` : '');
-        
-        latestCacheKeyRef.current = currentActiveKey;
-
-        // 1. 優先載入或請求目前分頁分析
-        getOrFetch(currentActiveKey, activeTab, trendType, quadrantMode);
-
-        // 2. 延遲 1 秒後，在背景依序預載入其他分頁的分析 (避免同時對 local GPU 送出大量請求造成塞車)
-        const timer = setTimeout(() => {
-            const tabsToPrefetch = [
-                { id: 'network', trend: 'rscore_avgscore', quad: 'rscore_avg' },
-                { id: 'trend', trend: 'rscore_avgscore', quad: 'rscore_avg' },
-                { id: 'health', trend: 'rscore_avgscore', quad: 'rscore_avg' },
-                { id: 'quadrant', trend: 'rscore_avgscore', quad: 'rscore_avg' },
-                { id: 'timeline', trend: 'rscore_avgscore', quad: 'rscore_avg' },
-                { id: 'flow', trend: 'rscore_avgscore', quad: 'rscore_avg' }
-            ].filter(t => {
-                if (t.id === activeTab) {
-                    if (activeTab === 'trend' && t.trend === trendType) return false;
-                    if (activeTab === 'quadrant' && t.quad === quadrantMode) return false;
-                    if (activeTab !== 'trend' && activeTab !== 'quadrant') return false;
-                }
-                return true;
-            });
-
-            // 啟動背景佇列預載入
-            prefetchSequentially(tabsToPrefetch, isCurrent);
-        }, 1000);
-
-        return () => {
-            isCurrent = false;
-            clearTimeout(timer);
-        };
-    }, [selectedDept, activeTab, selectedDimension, currentYear, trendType, quadrantMode]);
-
-    const prefetchSequentially = async (tabs, isCurrent) => {
-        for (const t of tabs) {
-            if (!isCurrent) break;
-
-            const cacheKey = `${currentYear}_${selectedDimension}_${selectedDept}_${t.id}` +
-                (t.id === 'trend' ? `_${t.trend}` : '') +
-                (t.id === 'quadrant' ? `_${t.quad}` : '');
-
-            // 若該分頁的快取已存在或正在請求中，則跳過
-            if (cacheRef.current[cacheKey]) {
-                continue;
-            }
-
-            try {
-                // 在背景發起非同步 Fetch 並存入快取 (使用 Promise)
-                await getOrFetch(cacheKey, t.id, t.trend, t.quad);
-            } catch (err) {
-                console.warn('Background prefetch error for key:', cacheKey, err);
-            }
-        }
-    };
-
-    const getOrFetch = (cacheKey, tabId, tType, qMode) => {
-        // A. 命中快取且已完成，直接呈現
-        if (cacheRef.current[cacheKey]) {
-            const entry = cacheRef.current[cacheKey];
-            if (entry.status === 'success') {
-                if (latestCacheKeyRef.current === cacheKey) {
-                    setAnalysis(entry.data);
-                    setError('');
-                    setIsLoading(false);
-                }
-                return entry.promise;
-            } else if (entry.status === 'pending') {
-                // B. 快取中已有正在進行的請求，進行監聽並顯示載入中
-                if (latestCacheKeyRef.current === cacheKey) {
-                    setIsLoading(true);
-                    setError('');
-                    setAnalysis('');
-                }
-                entry.promise.then(
-                    (data) => {
-                        if (latestCacheKeyRef.current === cacheKey) {
-                            setAnalysis(data);
-                            setError('');
-                            setIsLoading(false);
-                        }
-                    },
-                    (err) => {
-                        if (latestCacheKeyRef.current === cacheKey) {
-                            setError(err.message);
-                            setIsLoading(false);
-                        }
-                    }
-                );
-                return entry.promise;
-            }
-        }
-
-        // C. 快取中沒有此鍵，發起全新請求
-        if (latestCacheKeyRef.current === cacheKey) {
-            setIsLoading(true);
-            setError('');
-            setAnalysis('');
-        }
-
-        const fetchPromise = doApiFetch(cacheKey, tabId, tType, qMode);
-
-        cacheRef.current[cacheKey] = {
-            status: 'pending',
-            data: '',
-            error: '',
-            promise: fetchPromise
-        };
-
-        fetchPromise.then(
-            (resultText) => {
-                cacheRef.current[cacheKey] = {
-                    status: 'success',
-                    data: resultText,
-                    error: '',
-                    promise: fetchPromise
-                };
-                if (latestCacheKeyRef.current === cacheKey) {
-                    setAnalysis(resultText);
-                    setError('');
-                    setIsLoading(false);
-                }
-            },
-            (err) => {
-                cacheRef.current[cacheKey] = {
-                    status: 'error',
-                    data: '',
-                    error: err.message,
-                    promise: fetchPromise
-                };
-                if (latestCacheKeyRef.current === cacheKey) {
-                    setError(err.message);
-                    setIsLoading(false);
-                }
-            }
-        );
-
-        return fetchPromise;
-    };
+        analysisCacheRef.current = analysisCache;
+    }, [analysisCache]);
 
     const doApiFetch = async (cacheKey, tabId, tType, qMode) => {
         try {
             const targetName = currentDeptInfo?.name ? currentDeptInfo.name.replace(/\n/g, ' ') : selectedDept;
-        const dimensionText = selectedDimension === 'school' ? '學校' : selectedDimension === 'group' ? '系組' : '科系';
+            const dimensionText = selectedDimension === 'school' ? '學校' : selectedDimension === 'group' ? '系組' : '科系';
 
-        // Choose prompt and content based on tabId
-        let systemPrompt = "你是一個高階教育校務研究與招生戰略分析專家。請只使用正體中文（繁體中文）回答問題。請直接輸出分析結果（直接從大標題或第一段診斷內容開始），絕對不能包含任何社交寒暄、客套話、前言、開場白（例如「好的，我將為您分析...」、「身為分析專家，我將針對...」等）以及結語，直奔分析主題。重要：請勿使用 LaTeX 數學符號或 LaTeX 語法（例如：不要使用 $ 符號包裹算式、不要使用 \\times、\\%、\\frac 等 LaTeX 命令），請直接使用一般文字與符號（如：使用 × 或 * 表示相乘、使用 % 表示百分比、直接書寫 4/4 = 100% 即可）。";
-        let prompt = "";
+            const sortedRankings = [...rankings].sort((a,b) => (b.r_score || 0) - (a.r_score || 0));
+            const targetRankIndex = sortedRankings.findIndex(r => r.id === selectedDept);
+            const targetRank = targetRankIndex !== -1 ? targetRankIndex + 1 : 'N/A';
+            const totalRanked = sortedRankings.length;
+            const targetRS = rankings.find(r => r.id === selectedDept)?.r_score || 'N/A';
 
-        if (tabId === 'network') {
-            const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
-            const inflow = [];
-            const outflow = [];
-            const draws = [];
+            // Choose prompt and content based on tabId
+            let systemPrompt = "你是一個高階教育校務研究與招生戰略分析專家。請只使用正體中文（繁體中文）回答問題。請直接輸出分析結果（直接從大標題或第一段診斷內容開始），絕對不能包含任何社交寒暄、客套話、前言、開場白（例如「好的，我將為您分析...」、「身為分析專家，我將針對...」等）以及結語，直奔分析主題。重要：請勿使用 LaTeX 數學符號或 LaTeX 語法（例如：不要使用 $ 符號包裹算式、不要使用 \\times、\\%、\\frac 等 LaTeX 命令），請直接使用一般文字與符號（如：使用 × 或 * 表示相乘、使用 % 表示百分比、直接書寫 4/4 = 100% 即可）。";
+            let prompt = "";
 
-            connectedEdges.forEach(edge => {
-                if (edge.from === edge.to) return;
-                const fromName = rankings.find(r => r.id === edge.from)?.name.replace(/\n/g, ' ') || edge.from;
-                const toName = rankings.find(r => r.id === edge.to)?.name.replace(/\n/g, ' ') || edge.to;
+            if (tabId === 'network') {
+                const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
+                const inflow = [];
+                const outflow = [];
+                const draws = [];
 
-                if (edge.drawn) {
-                    draws.push(`- 與【${edge.from === selectedDept ? toName : fromName}】平手交集（雙重錄取考生皆放棄）：${edge.value || 0} 人`);
-                } else if (edge.from === selectedDept) {
-                    outflow.push(`- 流失至【${toName}】（考生選擇對方）：${edge.value || 0} 人`);
-                } else {
-                    inflow.push(`- 從【${fromName}】流入（考生選擇本校）：${edge.value || 0} 人`);
-                }
-            });
+                connectedEdges.forEach(edge => {
+                    if (edge.from === edge.to) return;
+                    const fromName = rankings.find(r => r.id === edge.from)?.name.replace(/\n/g, ' ') || edge.from;
+                    const toName = rankings.find(r => r.id === edge.to)?.name.replace(/\n/g, ' ') || edge.to;
 
-            prompt = `
-請針對以下【競爭關係網】數據進行深入分析，為校方提出具體招生建議：
+                    if (edge.drawn) {
+                        draws.push(`- 與【${edge.from === selectedDept ? toName : fromName}】平手交集（雙重錄取考生皆放棄）：${edge.value || 0} 人`);
+                    } else if (edge.from === selectedDept) {
+                        outflow.push(`- 流失至【${toName}】（考生選擇對方）：${edge.value || 0} 人`);
+                    } else {
+                        inflow.push(`- 從【${fromName}】流入（考生選擇本校）：${edge.value || 0} 人`);
+                    }
+                });
 
-分析對象：${targetName}
-維度：${dimensionText} 層級
-年份：${currentYear}學年度
+                prompt = `
+請針對以下【競爭關係網】數據進行深入分析，解釋目標${dimensionText}在當前學年度競爭群中的定位與攻防狀況：
 
-數據背景：
-當一名考生同時被本校與對手校系二階錄取（即雙重錄取），其最終報到登記的選擇即為一次「兩兩對決」。
-- 「流入」代表考生放棄對手，選擇登記本校（本校獲勝）。
-- 「流失」代表考生放棄本校，選擇登記對手（本校落敗）。
-- 「平手交集」代表考生同時放棄兩者。
+【分析主體資訊】
+- 目標${dimensionText}：${targetName}
+- 維度：${dimensionText} 層級
+- 當年度：${currentYear}學年度
+- 本系當年度 R-Score：${targetRS}
+- 本系在所有校系中的 R-Score 排名：第 ${targetRank} 名 / 共 ${totalRanked} 個
 
-數據內容：
-1. 【流入生源】（本校擊敗對手，吸引學生登記入學）：
+【當年度重榜競爭對手與生源流動明細】
+1. 吸引生源（本校擊敗對手，學生登記本校）：
 ${inflow.length > 0 ? inflow.join('\n') : '- 無顯著流入數據'}
 
-2. 【流失生源】（對手擊敗本校，拉走本校學生）：
+2. 流失生源（對手擊敗本校，學生登記對方）：
 ${outflow.length > 0 ? outflow.join('\n') : '- 無顯著流失數據'}
 
-3. 【平手交集】（重疊考生最終皆未登記此兩校，流向第三校）：
+3. 平手交集（雙重錄取學生皆放棄本校與對手，流向第三校）：
 ${draws.length > 0 ? draws.join('\n') : '- 無顯著平手交集數據'}
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 識別核心競爭圈：誰是我們真正的競爭對手？最主要的生源威脅來自誰？
-2. 競爭力強弱診斷：我們在哪些對手上佔有絕對優勢？在哪些對手上處於極度弱勢？其背後可能代表何種品牌形象或就業吸引力差距？
-3. 校方應對建議：面對主要的流失渠道，校方該採取何種具體戰略（如獎學金、課程特色行銷、面試日期撞期排程等）進行阻截？請以條列方式提出具體操作建議。
-            `;
-        } else if (tabId === 'trend') {
-            const trendRows = [];
-            const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
-            const topCompetitors = connectedEdges
-                .map(e => e.from === selectedDept ? e.to : e.from)
-                .filter((value, index, self) => self.indexOf(value) === index)
-                .map(id => {
-                    const edgeSum = connectedEdges
-                        .filter(e => e.from === id || e.to === id)
-                        .reduce((sum, e) => sum + (e.value || 0), 0);
-                    return { id, weight: edgeSum };
-                })
-                .sort((a, b) => b.weight - a.weight)
-                .slice(0, 3)
-                .map(c => c.id);
+請幫校方進行以下「單一年度競爭診斷與策略分析」並給予建議：
+1. 【競爭對手定位與分類】：識別本${dimensionText}當年度的主要競爭對手有哪些？這些競爭對手在 RS 排名中的位置如何？目標${dimensionText}在競爭群中是偏前段、中段還是後段？競爭對手是否集中在特定類型學校（如理工型、商管型、區域型、國立或私立等）？
+2. 【生源流入/流失強弱勢診斷】：分析我們在哪些對手身上佔有優勢（流入），在哪些對手身上處於弱勢（流失）？這背後代表了學生在選填時面臨怎樣的替代性與吸引力差距（如學校品牌、就業吸引力、地理位置等）？
+3. 【招生阻截與行銷策略建議】：針對最主要的流失對手，校方應如何調整招生宣傳、特色包裝、獎學金機制或甄試面試排程（如面試日期撞期排程）來進行生源阻截？請以條列方式提出具體操作建議。
+`;
+            } else if (tabId === 'trend') {
+                const trendRows = [];
+                const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
+                const topCompetitors = connectedEdges
+                    .map(e => e.from === selectedDept ? e.to : e.from)
+                    .filter((value, index, self) => self.indexOf(value) === index)
+                    .map(id => {
+                        const edgeSum = connectedEdges
+                            .filter(e => e.from === id || e.to === id)
+                            .reduce((sum, e) => sum + (e.value || 0), 0);
+                        return { id, weight: edgeSum };
+                    })
+                    .sort((a, b) => b.weight - a.weight)
+                    .slice(0, 3)
+                    .map(c => c.id);
 
-            historicalData.forEach(yrData => {
-                trendRows.push(`- **${yrData.name}** (本校): R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
-                topCompetitors.forEach(compId => {
-                    const compName = rankings.find(r => r.id === compId)?.name.replace(/\n/g, ' ') || compId;
-                    trendRows.push(`  - 對手【${compName}】: R-Score = ${yrData[`${compId}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${compId}_AvgScore`] || 'N/A'}`);
+                historicalData.forEach(yrData => {
+                    trendRows.push(`- **${yrData.name}** (本校): R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}, 平均分數PR = ${yrData[`${selectedDept}_AvgScorePR`] || 'N/A'}, 流入登分比例 = ${yrData[`${selectedDept}_FlowRate`] !== null ? yrData[`${selectedDept}_FlowRate`] + '%' : 'N/A'}`);
+                    topCompetitors.forEach(compId => {
+                        const compName = rankings.find(r => r.id === compId)?.name.replace(/\n/g, ' ') || compId;
+                        trendRows.push(`  - 對手【${compName}】: R-Score = ${yrData[`${compId}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${compId}_AvgScore`] || 'N/A'}, 平均分數PR = ${yrData[`${compId}_AvgScorePR`] || 'N/A'}, 流入登分比例 = ${yrData[`${compId}_FlowRate`] !== null ? yrData[`${compId}_FlowRate`] + '%' : 'N/A'}`);
+                    });
                 });
-            });
 
-            if (tType === 'rscore') {
-                prompt = `
-請針對以下【歷年發展趨勢 - R-Score 競爭力趨勢】數據進行深度分析，診斷本校系品牌強度的演進：
+                if (tType === 'rscore') {
+                    prompt = `
+請針對以下歷年【品牌強度 R-Score 競爭力趨勢】數據進行深度分析，診斷本${dimensionText}歷年的競爭力變化：
 
-分析對象：${targetName}
-歷年比較數據（包含主要重榜競爭對手）：
+【分析主體與主要競爭對手歷年 R-Score 數據】
 ${trendRows.join('\n')}
 
-數據背景：
-- **R-Score**：基於重榜決鬥勝率的品牌強度指標。R-Score 越高代表吸引力越強，代表當考生同時錄取本校與對手時，更多人選擇本校。
+請幫校方進行以下「歷年競爭強度 (R-Score) 趨勢診斷」：
+1. 【自身品牌實力消長】：本${dimensionText}歷年的 R-Score 競爭力是逐年上升、下降，還是持平？這反映了本${dimensionText}招生品牌實力的發展方向？
+2. 【對手競爭力趨勢對比】：在固定/主要的競爭對手群中，哪些對手逐年上升？哪些對手逐年下降？本${dimensionText}與主要競爭對手的實力差距（R-Score 差距）是在拉大還是在縮小？我們是否面臨被後段對手追趕或被前段對手拉開差距的壓力？
+3. 【品牌強化與定位引導策略】：針對上述趨勢，校方應採取哪些具體措施來穩定並提升 R-Score（如強化宣傳、重新包裝定位、特色跨域課程等）？請以條列方式提出策略建議。
+`;
+                } else if (tType === 'avgscore') {
+                    prompt = `
+請針對以下歷年【錄取分數門檻與 PR 值趨勢】數據進行深度分析，診斷本${dimensionText}歷年分數表現與其背後招生機制的消長：
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 本校品牌吸引力變遷：過去三年，本校的 R-Score 呈現上升、持平還是下降趨勢？這反映了本校在招生市場上的品牌形象發生了何種變化？
-2. 與競爭對手的 R-Score 消長對比：與主要競爭對手相比，我們的品牌吸引力優勢是否在流失？是否有特定的對手 R-Score 快速崛起，對我們構成直接威脅？
-3. 校方品牌強化建議：針對品牌吸引力的消長，校方應該如何在宣傳、系所定位、產學合作或就業宣傳上進行戰略強化，以提升重榜考生的選擇率？請以條列方式提出具體操作建議。
-                `;
-            } else if (tType === 'avgscore') {
-                prompt = `
-請針對以下【歷年發展趨勢 - 錄取分數門檻趨勢】數據進行深度分析，診斷錄取生源素質的演進：
-
-分析對象：${targetName}
-歷年比較數據（包含主要重榜競爭對手）：
+【分析主體與主要競爭對手歷年錄取分數及 PR 數據】
 ${trendRows.join('\n')}
 
-數據背景：
-- **平均分數**：學生入學考試的分數品質（學測/統測錄取分數門檻）。代表錄取學生的考生成績水準。
+請幫校方進行以下「錄取分數與 PR 趨勢診斷」：
+1. 【分數與 PR 相對定位消長】：本${dimensionText}的平均錄取分數及平均分數 PR 歷年呈現何種變化？
+2. 【矛盾情況診斷（錄取分數上升但 PR 下降）】：檢視是否出現「錄取分數上升，但平均 PR 反而下降」的情況？若有，請解釋其原因（是否是整體分數環境上升的結果，而本系相對競爭力實則下滑？這與流入登分比例的變化有何關聯？）。
+3. 【流入登分比例與錄取分數的聯動效應】：分析流入登分比例是否與錄取分數存在反向聯動？（例如流入登分比例下降，是否帶動錄取分數與相對 PR 上升？若流入登分比例長期偏高，如何導致後續錄取分數被拉低？）。
+4. 【穩定錄取分數與選材優化策略】：校方應如何調控以降低流入登分比例、穩定錄取分數？（如調整考科採計、落點最佳化等）。請以條列方式提出策略建議。
+`;
+                } else {
+                    // tType === 'rscore_avgscore'
+                    prompt = `
+請針對以下歷年【品牌強度 R-Score 與錄取分數 PR 綜合趨勢】數據進行深度分析，診斷本${dimensionText}的招生表現與競爭力的一致性：
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 錄取門檻走勢診斷：過去三年，本校的平均分數門檻是上升、持平還是下滑？這反映了生源素質的何種演變趨勢？
-2. 與主要對手的門檻差距消長：在錄取分數門檻上，我們與主要對手的差距是在拉大還是縮小？我們處於領先還是落後？
-3. 篩選機制調整建議：根據錄取門檻趨勢，校方在二階甄試的考科篩選、加權倍率或是名額配置上，該如何進行微調以確保錄取生源水準，或防止因分數崩盤導致的口碑下滑？請以條列方式提出具體政策建議。
-                `;
-            } else {
-                prompt = `
-請針對以下【歷年發展趨勢 - 綜合趨勢】數據進行深度分析，診斷本校系品牌吸引力與錄取門檻的關聯性：
-
-分析對象：${targetName}
-歷年比較數據（包含主要重榜競爭對手）：
+【分析主體與主要競爭對手歷年 R-Score、平均分數 PR 與流入登分比例數據】
 ${trendRows.join('\n')}
 
-數據背景：
-- **R-Score**：基於重榜決鬥勝率的品牌強度指標（吸引力指標），分值越高代表本校系對學生的品牌吸引力越強。
-- **平均分數**：錄取考生的學術考試成績門檻，代表考生的入學成績品質。
+請幫校方進行以下「品牌強度與分數 PR 的綜合一致性診斷」：
+1. 【競爭力與錄取表現一致性評估】：評估本${dimensionText}的歷年 brand 競爭力（R-Score）與分數表現是否一致？對照以下情況診斷其意義：
+   - 【同步改善】（RS 上升，PR 上升）：競爭力與實際分數表現皆強勢成長。
+   - 【同步變弱】（RS 下降，PR 下降）：品牌吸引力與錄取表現皆下滑。
+   - 【指標改善但實際未跟上】（RS 上升，PR 下降）：指標競爭力改善，但實際錄取分數表現未隨之提升，是否被對手進步幅度超越？
+   - 【分數改善但吸引力下降】（RS 下降，PR 上升）：實際分數改善（可能因名額控制或分發有利），但整體品牌吸引力與重榜競爭力下降。
+2. 【流入登分比例的負面影響解讀】：本${dimensionText}與主要對手相比，流入登分比例是否偏高？這如何解釋了本${dimensionText}「分數上升但相對 PR 排名下滑」或「競爭力指標與分數出現落差」的現象？
+3. 【校方具體精準招生與選材建議】：為了讓品牌強度與錄取分數同步回升、並減少登記分發的流入比例，校方應採取哪些戰略作為？請以條列方式提出策略建議。
+`;
+                }
+            } else if (tabId === 'health') {
+                const healthItems = [];
+                healthData.forEach(item => {
+                    const isSelf = item.name.includes(targetName.split(' ')[0]) || item.name.includes(targetName);
+                    healthItems.push(`- **${item.name}** ${isSelf ? '(本校)' : '(對手)'}: 甄審報到率 = ${item.yield_rate}% | 正取有效性 = ${item.zheng_effect}% | 流失/空缺比例 (即流入登分比例) = ${item.flow_rate}%`);
+                });
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 品牌吸引力與錄取門檻的背離診斷：本校的 R-Score 與 平均分數 在過去三年是呈現「健康同步增長」，還是出現背離？例如：「錄取分數上升，但 R-Score 下滑（招生門檻虛胖，實際品牌吸引力在萎縮）」或「R-Score 上升，但錄取分數未跟上（品牌聲譽良好，但篩選或計分機制未能成功篩選高分考生）」。
-2. 與主要對手的消長對比：綜合兩項指標，我們相較於這幾所對手，是在擴大領先、被逐漸追上，還是已經被超越？
-3. 校方具體政策建議：根據本校的吸引力與分數趨勢，校方應如何調整入學篩選權重？或是加強行銷宣傳？請以條列方式提出具體戰略。
-                `;
-            }
-        } else if (tabId === 'health') {
-            const healthItems = [];
-            healthData.forEach(item => {
-                const isSelf = item.name.includes(targetName.split(' ')[0]) || item.name.includes(targetName);
-                healthItems.push(`- **${item.name}** ${isSelf ? '(本校)' : '(對手)'}: 報到率 = ${item.yield_rate}% | 正取有效性 = ${item.zheng_effect}% | 流失/空缺比例 = ${item.flow_rate}%`);
-            });
+                prompt = `
+請針對以下學年度【招生效益】數據進行深入分析，診斷本${dimensionText}在甄審階段與後續分發的健康狀況：
 
-            prompt = `
-請針對以下 113 學年度【招生效益】數據進行分析：
-
-分析對象（與主要重榜競爭對手）：
+【分析主體與主要競爭對手招生效益數據】
 ${healthItems.join('\n')}
 
-指標定義：
-- **報到率（Yield Rate）**：最終報到人數佔招生名額的比例。
-- **正取有效性（Zheng Effect）**：正取學生最終來報到註冊的比例。如果低於 50%，代表大多數正取學生流失，極度依賴備取生遞補。
-- **流失/空缺比例（Flow Rate）**：放棄且未補滿的名額比例。
+【指標定義說明】
+- **正取有效性（正取生登記就讀率）**：正取生最終登記報到的比例，代表正取生「是否真的願意來」。
+- **甄審報到率（最終甄審報到人數佔招生名額比例）**：代表「備取生是否願意遞補進來」。
+- **流失/空缺比例（流入登分比例）**：未能在甄審階段填滿、最終流入登記分發的名額比例。
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 招生健康度診斷：本校的招生是屬於「高效穩定型」（正取就讀率高，報到率高）還是「備取依賴型」（正取流失極高，靠備取補滿）？這種狀態對系所的二階甄試（如面試、書審）有何實質影響？
-2. 競爭效益對比：與主要競爭對手相比，我們的正取有效性與報到率如何？我們在轉換率上輸在或贏在哪裡？
-3. 校方應對建議：招生名額分配與正備取倍率應如何進行戰略微調？例如是否應該拉大備取名額，或者調整面試分數篩選出忠誠學生？
-            `;
-        } else if (tabId === 'quadrant') {
-            // Helper function for calculations
-            const calculatePercentileRank = (data, field, targetField) => {
-                const values = data.map(d => d[field]).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
-                return data.map(d => ({
-                    ...d,
-                    [targetField]: d[field] === null || d[field] === undefined ? null : 
-                        Math.round((values.indexOf(d[field]) / (values.length - 1)) * 100)
-                }));
-            };
-            const calculateAverageScorePercentileRank = (data, field, targetField, dimension) => {
-                const values = data.map(d => d[field]).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
-                return data.map(d => ({
-                    ...d,
-                    [targetField]: d[field] === null || d[field] === undefined ? null : 
-                        Math.round((values.indexOf(d[field]) / (values.length - 1)) * 100)
-                }));
-            };
+請幫校方進行以下「招生效益與策略分析」：
+1. 【正備取留才健康度診斷】：對照以下四種情境，評估本${dimensionText}當前的招生狀態：
+   - 【雙高型】(正取有效性高，甄審報到率高)：招生狀況佳，正取與備取皆具吸引力。
+   - 【正取穩健型】(正取有效性高，甄審報到率低)：正取生願意來，但備取遞補意願不足。
+   - 【備取支撐型】(正取有效性低，甄審報到率高)：正取流失嚴重，但備取遞補意願強。
+   - 【雙低弱勢型】(正取有效性低，甄審報到率低)：最危險情境，正取不來、備取不補，代表目標${dimensionText}與更強競爭對手高度重疊。是否一階篩選條件設得太高，導致篩進來的學生極易流向更強學校？
+2. 【流入登分比例與分數壓低關係】：分析甄審報到率與流入登分比例的關係。與主要競爭對手相比，本${dimensionText}的流入登分比例是否偏高？如果只有本${dimensionText}特別高，代表本${dimensionText}存在相對競爭劣勢。這是否是導致錄取分數被拉低的主要因素？
+3. 【招生名額與選材策略調整建議】：針對上述效益問題，校方是否需要檢視一階篩選條件以防止與強校重疊？是否需要科學化調控以降低流入登分比例，穩定後續錄取分數？請以條列方式提出具體操作建議。
+`;
+            } else if (tabId === 'quadrant') {
+                // Helper function for calculations
+                const calculatePercentileRank = (data, field, targetField) => {
+                    const values = data.map(d => d[field]).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
+                    return data.map(d => ({
+                        ...d,
+                        [targetField]: d[field] === null || d[field] === undefined ? null : 
+                            Math.round((values.indexOf(d[field]) / (values.length - 1)) * 100)
+                    }));
+                };
+                const calculateAverageScorePercentileRank = (data, field, targetField, dimension) => {
+                    const values = data.map(d => d[field]).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
+                    return data.map(d => ({
+                        ...d,
+                        [targetField]: d[field] === null || d[field] === undefined ? null : 
+                            Math.round((values.indexOf(d[field]) / (values.length - 1)) * 100)
+                    }));
+                };
 
-            const rScorePrData = calculatePercentileRank(rankings, 'r_score', 'r_score_pr');
-            const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
-            const selfPr = bothPrData.find(item => item.id === selectedDept);
+                const rScorePrData = calculatePercentileRank(rankings, 'r_score', 'r_score_pr');
+                const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
+                const selfPr = bothPrData.find(item => item.id === selectedDept);
 
-            const currentRPr = selfPr?.r_score_pr !== null ? selfPr.r_score_pr : 'N/A';
-            const currentAPr = selfPr?.avg_score_pr !== null ? selfPr.avg_score_pr : 'N/A';
-            const currentZheng = currentDeptInfo?.zheng_effect !== undefined ? (currentDeptInfo.zheng_effect * 100).toFixed(1) : 'N/A';
-            const currentYield = currentDeptInfo?.yield_rate !== undefined ? (currentDeptInfo.yield_rate * 100).toFixed(1) : 'N/A';
+                const currentRPr = selfPr?.r_score_pr !== null ? selfPr.r_score_pr : 'N/A';
+                const currentAPr = selfPr?.avg_score_pr !== null ? selfPr.avg_score_pr : 'N/A';
+                const currentZheng = currentDeptInfo?.zheng_effect !== undefined ? (currentDeptInfo.zheng_effect * 100).toFixed(1) : 'N/A';
+                const currentYield = currentDeptInfo?.yield_rate !== undefined ? (currentDeptInfo.yield_rate * 100).toFixed(1) : 'N/A';
 
-            const pathPoints = [];
-            historicalData.forEach(yrData => {
-                pathPoints.push(`- **${yrData.name}**: R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
-            });
+                const pathPoints = [];
+                historicalData.forEach(yrData => {
+                    pathPoints.push(`- **${yrData.name}**: R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
+                });
 
-            if (qMode === 'effect_yield') {
-                prompt = `
-請針對以下【四象限落點定位 - 招生效益落點】數據進行深度分析，診斷本校系的正備取招生轉換效益：
+                if (qMode === 'effect_yield') {
+                    prompt = `
+請針對以下【四象限落點定位 - 招生效益落點】數據進行深度分析，診斷本${dimensionText}的正備取招生轉換效益與流失風險：
 
-分析對象：${targetName}
-維度：${dimensionText} 層級
+【分析主體資訊】
+- 目標${dimensionText}：${targetName}
+- 維度：${dimensionText} 層級
 
-招生效益核心指標（113學年）：
+招生效益核心數據（113學年）：
 - **正取有效性（正取生登記就讀率）**: ${currentZheng}% (中位數一般為 50%)
 - **報到率（最終入學人數佔名額比例）**: ${currentYield}% (滿額為 100%)
 
@@ -701,21 +557,22 @@ ${healthItems.join('\n')}
 3. 【危險流失型】(正取有效性 < 50%, 報到率 < 100%)：正取流失嚴重，且備取不足或學生放棄，最終產生招生缺額。
 4. 【高忠誠缺額型】(正取有效性 >= 50%, 報到率 < 100%)：正取就讀意願高，但可能因備取設定過少或名額配置問題而未招滿。
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 當前招生狀態定位：本校/系目前處於哪一個招生效益象限？是否存在過度依賴備取生（高保底穩健型）或面臨招生名額未滿（缺額流失）的風險？
-2. 二階甄試篩選機制診斷：正取有效性高低代表了什麼？校方在面試或書審階段，是否未能有效甄別考生的「就讀忠誠度」，導致正取考生重複錄取其他名校而大量流失？
-3. 校方具體應對建議：
+請幫校方進行以下「招生效益落點與二階篩選診斷」：
+1. 【當前招生效益定位】：本${dimensionText}目前處於哪一個招生效益象限？是否存在過度依賴備取生（高保底穩健型）或面臨招生名額未滿（危險流失型）的風險？這背後的根本原因是什麼？
+2. 【二階甄試與忠誠度診斷】：正取有效性高低代表正取生真的願意來的意願。如果正取有效性偏低，代表發出正取的學生大多流向其他更強競爭學校。我們在面試或書審階段，是否未能有效甄別考生的「就讀忠誠度」？
+3. 【正備取名額優化建議】：
    - 應如何科學地調整正備取名額比例與備取倍率？
-   - 在甄試面試設計、聯絡正備取生以及宣傳策略上，應採取什麼行動來提高正取就讀率或確保備取遞補成功？請以條列方式提出具體操作建議。
-                `;
-            } else {
-                prompt = `
-請針對以下【四象限落點定位與歷年移動軌跡】數據進行深度分析，診斷本校系品牌競爭力落點與歷年消長：
+   - 在甄試面試設計、聯絡正備取生以及宣傳策略上，應採取什麼行動來提高正取就讀率或確保備取遞補成功，進而降低流入登分比例？請以條列方式提出具體操作建議。
+`;
+                } else {
+                    prompt = `
+請針對以下【四象限落點定位與歷年移動軌跡】數據進行深度分析，診斷本${dimensionText}品牌競爭力落點與歷年消長：
 
-分析對象：${targetName}
-維度：${dimensionText} 層級
+【分析主體資訊】
+- 目標${dimensionText}：${targetName}
+- 維度：${dimensionText} 層級
 
-四象限定位標準（113學年）：
+當年度四象限指標（113學年）：
 - **R-Score PR（品牌競爭百分等級）**: ${currentRPr} (中位數為 50)
 - **最低錄取平均分數 PR（考生成績百分等級）**: ${currentAPr} (中位數為 50)
 
@@ -723,54 +580,124 @@ ${healthItems.join('\n')}
 ${pathPoints.join('\n')}
 
 象限類型定義：
-1. 【強勢落點型】(R-Score PR >= 50, Avg PR >= 50)：品牌吸引力與錄取分數皆高於中位數。
-2. 【競爭支撐型】(R-Score PR >= 50, Avg PR < 50)：吸引力強，但錄取學生學測分數偏低。
-3. 【分數支撐型】(R-Score PR < 50, Avg PR >= 50)：分數高，但品牌吸引力弱，重榜生容易將本校當成備胎。
-4. 【落點弱勢型】(R-Score PR < 50, Avg PR < 50)：雙低弱勢。
+1. 【強勢落點型】(R-Score PR >= 50, Avg PR >= 50)：品牌吸引力與錄取分數皆高於中位數，為理想的招生狀態。
+2. 【競爭支撐型】(R-Score PR >= 50, Avg PR < 50)：吸引力強（重榜吸引力好），但錄取學生的學測成績偏低，可能有名額過多或篩選門檻限制，有待提升分數門檻。
+3. 【分數支撐型】(R-Score PR < 50, Avg PR >= 50)：分數高，但品牌吸引力弱，重榜生容易將本校當成保底備胎，存在嚴重的「高分備胎化」風險。
+4. 【落點弱勢型】(R-Score PR < 50, Avg PR < 50)：雙低弱勢，品牌實力與生源分數皆落後。
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 當前定位診斷：本校/系目前處於哪一個象限？是否面臨「高分備胎化」或「雙低弱勢」的風險？
-2. 軌跡移動趨勢分析：歷年分數與 R-Score 是呈健康成長，還是在競爭力上面臨衰退？
-3. 校方應對建議：校方應該採取什麼策略，將定位軌跡拉回或引導至「強勢落點型」？請以條列方式提出具體戰略建議。
-                `;
-            }
-        } else if (tabId === 'timeline') {
-            const timelinePoints = [];
-            timelineRankData.forEach((data) => {
-                const ranks = data.ranks || {};
-                const totalCount = data.totalCount || 0;
-                const currId = data.selectedDeptId || selectedDept;
-                const currRank = ranks[currId];
-                const pr = currRank ? Math.round((1 - (currRank - 1) / totalCount) * 100) : 'N/A';
-                
-                timelinePoints.push(`- **${data.year}**:`);
-                timelinePoints.push(`  - 本校排名: ${currRank || 'N/A'} / 總競爭數 ${totalCount} (PR ${pr})`);
-            });
+請幫校方進行以下「圖表細節分析與軌跡診斷」並給予建議：
+1. 【當前品牌定位診斷】：本${dimensionText}目前處於哪一個定位象限？是否面臨「高分備胎化（分數高但吸引力弱）」或「雙低弱勢」的風險？
+2. 【歷年移動軌跡消長】：分析歷年軌跡走向。我們的競爭實力是朝著「強勢落點型」健康移動，還是逐漸向「落點弱勢型」或「分數支撐型（備胎化）」傾斜？這反映了這幾年招生或考科採計策略的成效如何？
+3. 【定位引導與策略建議】：若要將定位軌跡引導至「強勢落點型」，校方該採取何種具體戰略（如調整考科採計、重新包裝學系定位、或是加強特定競爭對手的防範）？請以條列方式提出策略建議。
+`;
+                }
+            } else if (tabId === 'timeline') {
+                const timelinePoints = [];
+                timelineRankData.forEach((data) => {
+                    const ranks = data.ranks || {};
+                    const totalCount = data.totalCount || 0;
+                    const currId = data.selectedDeptId || selectedDept;
+                    const currRank = ranks[currId];
+                    const pr = currRank ? Math.round((1 - (currRank - 1) / totalCount) * 100) : 'N/A';
+                    
+                    timelinePoints.push(`- **${data.year}**:`);
+                    timelinePoints.push(`  - 本校排名: ${currRank || 'N/A'} / 總競爭數 ${totalCount} (PR ${pr})`);
+                });
 
-            prompt = `
-請針對以下【競爭時間軸與重榜競爭群體演進】數據進行分析：
+                let fixedCompText = "- 無固定競爭對手數據";
+                let newCompText = "- 無新增競爭對手數據";
+                let disappearedCompText = "- 無消失競爭對手數據";
 
-分析對象：${targetName}
-維度：${dimensionText} 層級
+                if (timelineRankData && timelineRankData.length > 0) {
+                    const sortedTimeline = [...timelineRankData].sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                    const latestYearData = sortedTimeline[sortedTimeline.length - 1];
+                    const previousYearsData = sortedTimeline.slice(0, sortedTimeline.length - 1);
 
-歷年名次與百分等級（PR）：
+                    const latestIds = latestYearData ? (latestYearData.activeIds || []) : [];
+                    const previousIdsUnion = new Set();
+                    const previousIdsIntersection = new Set();
+                    let isFirstPrev = true;
+
+                    previousYearsData.forEach(yr => {
+                        (yr.activeIds || []).forEach(id => {
+                            previousIdsUnion.add(id);
+                        });
+                        if (isFirstPrev) {
+                            (yr.activeIds || []).forEach(id => previousIdsIntersection.add(id));
+                            isFirstPrev = false;
+                        } else {
+                            const currentYrIds = new Set(yr.activeIds || []);
+                            for (let id of previousIdsIntersection) {
+                                if (!currentYrIds.has(id)) {
+                                    previousIdsIntersection.delete(id);
+                                }
+                            }
+                        }
+                    });
+
+                    const latestNamesMap = latestYearData ? (latestYearData.names || {}) : {};
+                    const getDeptName = (id) => {
+                        const cleanName = latestNamesMap[id] || rankings.find(r => r.id === id)?.name || id;
+                        return cleanName.replace(/\n/g, ' ').trim();
+                    };
+
+                    const getPrevDeptName = (id) => {
+                        const prevYr = previousYearsData.find(yr => yr.names && yr.names[id]);
+                        const cleanName = prevYr ? prevYr.names[id] : rankings.find(r => r.id === id)?.name || id;
+                        return cleanName.replace(/\n/g, ' ').trim();
+                    };
+
+                    const newIds = latestIds.filter(id => id !== selectedDept && !previousIdsUnion.has(id));
+                    const disappearedIds = Array.from(previousIdsUnion).filter(id => id !== selectedDept && !latestIds.includes(id));
+                    const fixedIds = latestIds.filter(id => id !== selectedDept && previousIdsIntersection.has(id));
+
+                    if (newIds.length > 0) {
+                        newCompText = newIds.map(id => `- 【${getDeptName(id)}】(從未在往年競爭圈出現，今年新增)`).join('\n');
+                    }
+                    if (disappearedIds.length > 0) {
+                        disappearedCompText = disappearedIds.map(id => `- 【${getPrevDeptName(id)}】(往年有競爭關係，今年已退出競爭圈)`).join('\n');
+                    }
+                    if (fixedIds.length > 0) {
+                        fixedCompText = fixedIds.map(id => `- 【${getDeptName(id)}】(歷年皆存在競爭關係，屬於長期主要對手)`).join('\n');
+                    }
+                }
+
+                prompt = `
+請針對以下【競爭時間軸與重榜競爭群體演進】數據進行深度分析，解釋目標${dimensionText}在歷史競爭版圖中的變化：
+
+【分析主體資訊】
+- 目標${dimensionText}：${targetName}
+- 維度：${dimensionText} 層級
+
+【歷年名次與百分等級（PR）演進】
 ${timelinePoints.join('\n')}
 
-數據背景：
-時間軸展示了本校系與其他競爭學校「重榜考生交集」的演進。名次與 PR 越高代表在競爭圈中的贏面越大。
+【競爭圈結構動態分析】
+1. 固定競爭對手（歷年皆有重榜競爭關係）：
+${fixedCompText}
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 自身實力消長：在核心競爭圈內，我們的名次與 PR 歷年來是上升還是下滑？這反映了什麼 brand 定位危機或機會？
-2. 競爭格局演變：我們在競爭圈中的主導權有何變化？
-3. 校方應對建議：校方應如何調配行銷資源，以防堵新舊競爭對手的包夾，並穩固領先地位？
-            `;
-        } else if (tabId === 'flow') {
-            const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
-            const inflowDetails = [];
-            const outflowDetails = [];
+2. 新增競爭對手（今年新加入重榜競爭圈）：
+${newCompText}
 
-            connectedEdges.forEach(edge => {
-                if (edge.from === edge.to) return;
+3. 消失競爭對手（往年有競爭關係，今年已退出）：
+${disappearedCompText}
+
+請幫校方進行以下「競爭對手變化診斷」：
+1. 【自身相對位置消長】：在重榜競爭圈中，我們歷年的名次與相對百分等級（PR）是上升、持平還是下降？這代表我們在競爭版圖中的實力是在穩步增長還是逐漸衰退？我們的市場定位是否正在被重新定義？
+2. 【競爭對手結構與異動解讀】：
+   - 【對於固定對手】：我們與固定對手的實力差距是在縮小還是拉大？誰在持續成長對我們構成長期壓力？我們是否長期落後同一批對手，抑或逐漸追上他們？
+   - 【對於消失對手】：他們為何退出競爭圈？是他們變得太強（升級到更高層次競爭圈），還是變弱（退出本校系競爭範圍），亦或是學生的選填偏好或招生條件發生了轉移？
+   - 【對於新增對手】：今年為何會有新對手加入？這是否意味著學生的選填偏好出現轉移？本${dimensionText}面臨了什麼樣的新招生壓力？
+3. 【誰是剋星與生源優勢】：根據競爭關係，分析誰是我們的「剋星」（經常壓過本校系、吸走重榜學生）？我們又是誰的「剋星」（相對於哪些對手具有重榜優勢）？
+4. 【防堵包夾與戰略防禦建議】：面對新對手的侵入、舊對手的長期拉鋸與天敵威脅，校方應如何調整招生宣傳、推廣與資源調配，防堵對手包夾並鞏固領先位置？請以條列方式提出策略建議。
+`;
+            } else if (tabId === 'flow') {
+                const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
+                const inflowDetails = [];
+                const outflowDetails = [];
+
+                connectedEdges.forEach(edge => {
+                    if (edge.from === edge.to) return;
                     if (edge.drawn) return;
                     const fromName = rankings.find(r => r.id === edge.from)?.name.replace(/\n/g, ' ') || edge.from;
                     const toName = rankings.find(r => r.id === edge.to)?.name.replace(/\n/g, ' ') || edge.to;
@@ -784,30 +711,30 @@ ${timelinePoints.join('\n')}
                 });
 
                 prompt = `
-請針對以下【重榜學生真實流動情報】數據進行分析：
+請針對以下【重榜學生真實流動情報】數據進行深入分析，診斷本${dimensionText}在考生實際報到時的搶人攻防戰果：
 
-分析對象：${targetName}
-年份：113學年度
+【分析主體資訊】
+- 目標${dimensionText}：${targetName}
+- 當年度：113學年度
 
-流動數據明細：
-1. 【流失生源明細】（同時錄取下，選擇登記對方校系）：
+【流動情報明細】
+1. 流失生源明細（同時錄取本校與對手，考生最終選擇登記對方）：
 ${outflowDetails.length > 0 ? outflowDetails.join('\n') : '  - 無流失數據'}
 
-2. 【流入生源明細】（同時錄取下，放棄對方選擇登記本校）：
+2. 流入生源明細（同時錄取本校與對手，考生最終選擇登記本校）：
 ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
 
-請幫校方進行以下「圖表細節分析」並給予建議：
-1. 鎖定「頭號天敵」與「生源苦主」：誰是搶走我們最多學生的學校（頭號天敵）？我們能從誰那裡拉來最多學生（生源苦主）？
-2. 淨流量與品牌赤字：我們的重榜流動是呈現「淨流入」還是「淨流失」？這對學校整體的品牌實力防禦有何啟示？
-3. 量化備取長度與阻截建議：
-   - 根據流失的人數與比例，校方應如何科學化地設定備取名單長度，以確保不會產生缺額？
-   - 針對最主要的流失去向（頭號天敵），我們應如何設計具體的招生行銷、獎學金或課程包包裝實施精準防禦？
-                `;
+請幫校方進行以下「流動情報診斷與備取策略建議」：
+1. 【頭號天敵與生源苦主分析】：
+   - 誰是搶走我們最多學生的「頭號天敵」？這反映了我們與該校系在學校品牌、地理位置或就業吸引力上有何落差？
+   - 我們能從誰身上拉來最多學生（生源苦主）？這代表我們相對於哪些對手具有優勢？
+2. 【淨流量與品牌赤字】：我們的重榜流動是呈現「淨流入」還是「淨流失」？這對本${dimensionText}整體的品牌實力防禦有何啟示？
+3. 【科學化備取名單長度設定】：根據流失學生的具體人數與流動規模，校方應如何科學化地設定二階備取名單長度，以確保在甄審階段能完全補滿、絕不產生流入登記分發的名額空缺？
+4. 【針對主要天敵的精準防禦阻截】：針對最主要的流失渠道（頭號天敵），我們應如何設計具體的招生行銷、獎學金阻截方案、或特色課程推廣，以提高學生的登記就讀忠誠度？請以條列方式提出具體操作建議。
+`;
             }
 
             // Dynamically resolve the hostname of the server hosting the app.
-            // This ensures other computers in the network route requests to Computer A (140.130.33.196)
-            // and bypasses Chrome's PNA (Private Network Access) loopback block.
             let host = window.location.hostname;
             if (!host || host === 'localhost' || host === '127.0.0.1') {
                 host = '127.0.0.1'; // Local dev fallback
@@ -832,27 +759,109 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
             });
 
             if (!response.ok) {
-                throw new Error(`vLLM 伺服器回傳狀態碼 ${response.status}`);
+                throw new Error(`vLLM 伺服器錯誤代碼 ${response.status}`);
             }
 
             const resData = await response.json();
             const resultText = resData.choices[0].message.content;
 
-            // 清理 LaTeX 格式與數學公式符號 (如 $...$, \times, \% 等)
+            // 清理 LaTeX 語法與數學公式符號 (如 $...$, \times, \% 等)
             const cleanedText = resultText
-                .replace(/\$([^$]+)\$/g, '$1') // 移除包含在 $ ... $ 內部的包裹字元
-                .replace(/\\%/g, '%')           // 將 \% 轉換為 %
-                .replace(/\\times/g, '×')       // 將 \times 轉換為 ×
-                .replace(/\\div/g, '÷')         // 將 \div 轉換為 ÷
-                .replace(/\\cdot/g, '·');       // 將 \cdot 轉換為 ·
+                .replace(/\$([^$]+)\$/g, '$1') // 移除包含在 $ ... $ 內部的包裹符號
+                .replace(/\\%/g, '%')           // 將 \% 轉為 %
+                .replace(/\\times/g, '×')       // 將 \times 轉為 ×
+                .replace(/\\div/g, '÷')         // 將 \div 轉為 ÷
+                .replace(/\\cdot/g, '·');       // 將 \cdot 轉為 ·
 
-            // 檢查是否在此請求回傳期間，使用者已經切換了分頁/校系，若是則直接捨棄此回應 (解決 Race Condition)
             return cleanedText;
         } catch (err) {
             console.error('vLLM fetch error:', err);
             throw new Error(`無法從本地 vLLM 伺服器獲取分析結果。請確保您的 Docker 容器已在連接埠 18000 啟動，且模型已載入。 (Error: ${err.message})`);
         }
     };
+
+    useEffect(() => {
+        if (!isDataReady) return;
+
+        const prefix = `${currentYear}_${selectedDimension}_${selectedDept}`;
+        if (firedPrefixRef.current === prefix) return;
+        firedPrefixRef.current = prefix;
+
+        const targets = [
+            { keySuffix: 'network', tabId: 'network', tType: '', qMode: '' },
+            { keySuffix: 'trend_rscore_avgscore', tabId: 'trend', tType: 'rscore_avgscore', qMode: '' },
+            { keySuffix: 'trend_rscore', tabId: 'trend', tType: 'rscore', qMode: '' },
+            { keySuffix: 'trend_avgscore', tabId: 'trend', tType: 'avgscore', qMode: '' },
+            { keySuffix: 'health', tabId: 'health', tType: '', qMode: '' },
+            { keySuffix: 'quadrant_rscore_avg', tabId: 'quadrant', tType: '', qMode: 'rscore_avg' },
+            { keySuffix: 'quadrant_effect_yield', tabId: 'quadrant', tType: '', qMode: 'effect_yield' },
+            { keySuffix: 'timeline', tabId: 'timeline', tType: '', qMode: '' },
+            { keySuffix: 'flow', tabId: 'flow', tType: '', qMode: '' }
+        ];
+
+        // Check which targets actually need to be fetched (not in cache or had error)
+        const needToFetch = targets.filter(t => {
+            const cacheKey = `${prefix}_${t.keySuffix}`;
+            const cached = analysisCacheRef.current[cacheKey];
+            return !cached || cached.status === 'error';
+        });
+
+        if (needToFetch.length === 0) return;
+
+        // Set all needToFetch to loading in cache in state and ref synchronously
+        setAnalysisCache(prev => {
+            const updated = { ...prev };
+            needToFetch.forEach(t => {
+                const cacheKey = `${prefix}_${t.keySuffix}`;
+                updated[cacheKey] = { status: 'loading', text: '', error: '' };
+            });
+            analysisCacheRef.current = updated;
+            return updated;
+        });
+
+        // Fire API requests in parallel for needToFetch
+        needToFetch.forEach(async (t) => {
+            const cacheKey = `${prefix}_${t.keySuffix}`;
+            try {
+                const result = await doApiFetch(cacheKey, t.tabId, t.tType, t.qMode);
+                setAnalysisCache(prev => {
+                    const updated = {
+                        ...prev,
+                        [cacheKey]: { status: 'success', text: result, error: '' }
+                    };
+                    analysisCacheRef.current = updated;
+                    return updated;
+                });
+            } catch (err) {
+                setAnalysisCache(prev => {
+                    const updated = {
+                        ...prev,
+                        [cacheKey]: { status: 'error', text: '', error: err.message }
+                    };
+                    analysisCacheRef.current = updated;
+                    return updated;
+                });
+            }
+        });
+    }, [isDataReady, selectedDept, currentYear, selectedDimension, historicalData, rankings, graphData, healthData, timelineRankData]);
+
+    const getActiveKey = () => {
+        const prefix = `${currentYear}_${selectedDimension}_${selectedDept}`;
+        if (activeTab === 'trend') {
+            return `${prefix}_trend_${trendType}`;
+        }
+        if (activeTab === 'quadrant') {
+            return `${prefix}_quadrant_${quadrantMode}`;
+        }
+        return `${prefix}_${activeTab}`;
+    };
+
+    const currentActiveKey = getActiveKey();
+    const activeEntry = analysisCache[currentActiveKey];
+
+    const isLoading = !isDataReady || (activeEntry ? activeEntry.status === 'loading' : true);
+    const error = isDataReady && activeEntry?.status === 'error' ? activeEntry.error : '';
+    const analysis = isDataReady && activeEntry?.status === 'success' ? activeEntry.text : '';
 
     const getTitleIcon = () => {
         switch (activeTab) {
@@ -873,7 +882,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
                 if (trendType === 'rscore') return 'AI 歷年品牌強度 (R-Score) 趨勢解析';
                 if (trendType === 'avgscore') return 'AI 歷年錄取分數門檻趨勢解析';
                 return 'AI 歷年品牌與分數綜合趨勢解析';
-            case 'health': return 'AI 招生效益與效益診斷';
+            case 'health': return 'AI 招生效益與健康度診斷';
             case 'quadrant':
                 if (quadrantMode === 'effect_yield') return 'AI 正取有效性與報到率落點診斷';
                 return 'AI 校系落點定位與歷年軌跡診斷';
@@ -901,7 +910,9 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
                         <div className="ai-skeleton-line short"></div>
                         <div className="ai-loading-text">
                             <span className="ai-spinner"></span>
-                            本地 vLLM (Gemma-4) 正在針對此圖表數據進行決策診斷中，請稍候...
+                            {!isDataReady 
+                                ? "正在彙整歷年圖表與效益數據，準備進行 AI 深度診斷，請稍候..." 
+                                : "本地 vLLM (Gemma-4) 正在針對此圖表數據進行決策診斷中，請稍候..."}
                         </div>
                     </div>
                 )}
