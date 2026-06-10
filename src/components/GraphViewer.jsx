@@ -10,7 +10,7 @@ import FlowTable from './charts/FlowTable';
 import PlacementQuadrantChart from './charts/PlacementQuadrantChart';
 import AIAnalysisPanel from './AIAnalysisPanel';
 
-const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimension, currentYear }) => {
+const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimension, currentYear, setSelectedYear }) => {
     const [activeTab, setActiveTab] = useState('network');
     const [trendType, setTrendType] = useState('rscore_avgscore');
     const [quadrantMode, setQuadrantMode] = useState('rscore_avg');
@@ -88,6 +88,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                                 avgTicks={avgTicks}
                                 selectedDimension={selectedDimension}
                                 myLabel={myLabel}
+                                currentYear={currentYear}
+                                setSelectedYear={setSelectedYear}
                             />
                         )}
 
@@ -119,6 +121,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                                 trendDepts={trendDepts}
                                 selectedDept={selectedDept}
                                 myLabel={myLabel}
+                                currentYear={currentYear}
+                                setSelectedYear={setSelectedYear}
                             />
                         )}
 

@@ -78,6 +78,7 @@ function App() {
           years={years}
           selectedDimension={selectedDimension}
           currentYear={selectedYear}
+          setSelectedYear={setSelectedYear}
         />
       </div>
     </div>

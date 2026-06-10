@@ -296,6 +296,8 @@ const CustomTooltip = ({ active, payload, selectedDept, mode }) => {
 
 // --- Main Component ---
 
+const COMPARE_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899'];
+
 const PlacementQuadrantChart = ({
     mode: propsMode,
     setMode: propsSetMode,
@@ -312,101 +314,14 @@ const PlacementQuadrantChart = ({
     const [localMode, setLocalMode] = useState('rscore_avg');
     const mode = propsMode !== undefined ? propsMode : localMode;
     const setMode = propsSetMode !== undefined ? propsSetMode : setLocalMode;
-    const [historicalPathRaw, setHistoricalPathRaw] = useState([]);
+    const [allYearsRankings, setAllYearsRankings] = useState({});
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [comparedDepts, setComparedDepts] = useState([]);
 
-    // Fetch and process historical data to build selected department's path
+    // Clear compared competitors on department or dimension change
     useEffect(() => {
-        let isCurrent = true;
-        setHistoricalPathRaw([]); // Clear immediately when selectedDept changes
-
-        if (!selectedDept || !selectedDimension || !years || years.length === 0) {
-            return;
-        }
-
-        setLoadingHistory(true);
-        const fetchHistory = async () => {
-            try {
-                // Find current department details for name matching
-                const currentDeptItem = rankings?.find(r => r.id === selectedDept);
-                const currentDeptName = currentDeptItem ? currentDeptItem.name : '';
-                const normalizedCurrentName = normalizeName(currentDeptName);
-
-                const promises = years.map(async (year) => {
-                    try {
-                        const res = await fetch(`${import.meta.env.BASE_URL}rankings_${year}_${selectedDimension}.json`);
-                        if (!res.ok) return { year, data: null };
-                        const data = await res.json();
-                        return { year, data };
-                    } catch (e) {
-                        console.warn(`Could not load rankings for year ${year}`, e);
-                        return { year, data: null };
-                    }
-                });
-
-                const results = await Promise.all(promises);
-
-                if (!isCurrent) return;
-
-                const pathPoints = results
-                    .map(({ year, data }) => {
-                        if (!data || !Array.isArray(data)) return null;
-
-                        // Recalculate PR in the context of this specific year for Mode 1
-                        const rScorePrData = calculatePercentileRank(data, 'r_score', 'r_score_pr');
-                        const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
-
-                        // Find the department by exact normalized name
-                        const deptData = bothPrData.find(item => {
-                            return normalizedCurrentName && normalizeName(item.name) === normalizedCurrentName;
-                        });
-
-                        if (!deptData) return null;
-
-                        const rScorePr = parseNumber(deptData.r_score_pr);
-                        const avgScorePr = parseNumber(deptData.avg_score_pr);
-                        const yieldRate = parseNumber(deptData.yield_rate);
-                        const zhengEffect = parseNumber(deptData.zheng_effect);
-
-                        return {
-                            year: String(year),
-                            rScorePr,
-                            avgScorePr,
-                            zhengEffectPercent: zhengEffect !== null ? zhengEffect * 100 : null,
-                            yieldRatePercent: yieldRate !== null ? yieldRate * 100 : null,
-                            r_score: parseNumber(deptData.r_score),
-                            avg_score: parseNumber(deptData.avg_score),
-                            name: deptData.name,
-                            id: deptData.id
-                        };
-                    })
-                    .filter(Boolean);
-
-                // Sort path by year chronologically
-                pathPoints.sort((a, b) => {
-                    const numA = parseInt(a.year.replace(/\D/g, ''), 10) || 0;
-                    const numB = parseInt(b.year.replace(/\D/g, ''), 10) || 0;
-                    return numA - numB;
-                });
-
-                if (isCurrent) {
-                    setHistoricalPathRaw(pathPoints);
-                }
-            } catch (err) {
-                console.error("Error loading history for PlacementQuadrantChart", err);
-            } finally {
-                if (isCurrent) {
-                    setLoadingHistory(false);
-                }
-            }
-        };
-
-        fetchHistory();
-
-        return () => {
-            isCurrent = false;
-        };
-    }, [selectedDept, selectedDimension, years, rankings]);
+        setComparedDepts([]);
+    }, [selectedDept, selectedDimension]);
 
     // Compute PR on current year rankings (Full rankings logic)
     const processedRankings = useMemo(() => {
@@ -445,7 +360,6 @@ const PlacementQuadrantChart = ({
 
         const relatedIds = new Set([selectedDept]);
 
-        // 1. Build relatedIds based on trendDepts or graphData.edges
         if (trendDepts && trendDepts.length > 0) {
             trendDepts.forEach(d => {
                 if (d.id) relatedIds.add(d.id);
@@ -457,7 +371,6 @@ const PlacementQuadrantChart = ({
             });
         }
 
-        // 2. Build relationWeightMap based on graphData.edges
         const relationWeightMap = {};
         if (graphData?.edges?.length) {
             graphData.edges.forEach(edge => {
@@ -497,7 +410,6 @@ const PlacementQuadrantChart = ({
 
         const selectedPoint = mappedData.find(d => d.id === selectedDept);
 
-        // Competitors filtered by relationship and sorted by weight descending, taking top 15
         const competitorPoints = mappedData
             .filter(d => d.id !== selectedDept && relatedIds.has(d.id))
             .sort((a, b) => (relationWeightMap[b.id] || 0) - (relationWeightMap[a.id] || 0))
@@ -508,80 +420,118 @@ const PlacementQuadrantChart = ({
             : competitorPoints;
     }, [processedRankings, selectedDept, graphData, trendDepts, mode]);
 
-    // Check basic availability of data
-    if (!rankings || rankings.length === 0) {
-        return (
-            <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
-                    四象限落點定位分析
-                </h3>
-                <p style={{ fontSize: '14px', color: '#95a5a6' }}>
-                    資料不足，無法產生四象限落點定位分析。
-                </p>
-            </div>
-        );
-    }
+    // Fetch ranking data for all years when dimension or years change
+    useEffect(() => {
+        if (!selectedDimension || !years || years.length === 0) return;
+        let isCurrent = true;
+        setLoadingHistory(true);
 
-    const currentDept = rankings.find(r => r.id === selectedDept);
-    if (selectedDept && !currentDept) {
-        return (
-            <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
-                    四象限落點定位分析
-                </h3>
-                <p style={{ fontSize: '14px', color: '#95a5a6' }}>
-                    找不到目前選取校系組資料，無法產生四象限落點定位分析。
-                </p>
-            </div>
-        );
-    }
+        const fetchAllHistory = async () => {
+            try {
+                const promises = years.map(async (year) => {
+                    try {
+                        const res = await fetch(`${import.meta.env.BASE_URL}rankings_${year}_${selectedDimension}.json`);
+                        if (!res.ok) return { year, data: null };
+                        const data = await res.json();
+                        return { year, data };
+                    } catch (e) {
+                        console.warn(`Could not load rankings for year ${year}`, e);
+                        return { year, data: null };
+                    }
+                });
 
-    if (currentDept) {
-        if (mode === 'rscore_avg') {
-            const rVal = parseNumber(currentDept.r_score);
-            const aVal = parseNumber(currentDept.avg_score);
-            if (rVal === null || aVal === null) {
-                return (
-                    <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
-                        <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
-                            R-Score 與最低錄取平均分數 PR 四象限落點分析
-                        </h3>
-                        <p style={{ fontSize: '14px', color: '#95a5a6' }}>
-                            目前選取校系組缺少 R-Score 或平均分數資料，無法進行落點分析。
-                        </p>
-                    </div>
-                );
+                const results = await Promise.all(promises);
+                if (!isCurrent) return;
+
+                const rankingsMap = {};
+                results.forEach(({ year, data }) => {
+                    if (data) rankingsMap[year] = data;
+                });
+                setAllYearsRankings(rankingsMap);
+            } catch (err) {
+                console.error("Error loading all years history", err);
+            } finally {
+                if (isCurrent) setLoadingHistory(false);
             }
-        } else {
-            const zVal = parseNumber(currentDept.zheng_effect);
-            const yVal = parseNumber(currentDept.yield_rate);
-            if (zVal === null || yVal === null) {
-                return (
-                    <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
-                        <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
-                            正取有效性與報到率四象限分析
-                        </h3>
-                        <p style={{ fontSize: '14px', color: '#95a5a6' }}>
-                            目前選取校系組缺少正取有效性或報到率資料，無法進行分析。
-                        </p>
-                    </div>
-                );
-            }
-        }
-    }
+        };
 
-    if (finalChartData.length === 0) {
-        return (
-            <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
-                    四象限落點定位分析
-                </h3>
-                <p style={{ fontSize: '14px', color: '#95a5a6' }}>
-                    資料不足，無法產生四象限分析圖表。
-                </p>
-            </div>
-        );
-    }
+        fetchAllHistory();
+        return () => { isCurrent = false; };
+    }, [selectedDimension, years]);
+
+    // Helper to calculate path for any department name dynamically across all years
+    const getDeptPath = useMemo(() => {
+        return (deptId) => {
+            if (!deptId || !allYearsRankings || Object.keys(allYearsRankings).length === 0) return [];
+
+            const deptItem = processedRankings.find(r => r.id === deptId) || rankings.find(r => r.id === deptId);
+            if (!deptItem) return [];
+            const normalizedNameTarget = normalizeName(deptItem.name);
+
+            const pathPoints = Object.entries(allYearsRankings)
+                .map(([year, data]) => {
+                    if (!data || !Array.isArray(data)) return null;
+
+                    const rScorePrData = calculatePercentileRank(data, 'r_score', 'r_score_pr');
+                    const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
+
+                    const yearDept = bothPrData.find(item => normalizeName(item.name) === normalizedNameTarget);
+                    if (!yearDept) return null;
+
+                    const rScorePr = parseNumber(yearDept.r_score_pr);
+                    const avgScorePr = parseNumber(yearDept.avg_score_pr);
+                    const yieldRate = parseNumber(yearDept.yield_rate);
+                    const zhengEffect = parseNumber(yearDept.zheng_effect);
+
+                    return {
+                        year: String(year),
+                        rScorePr,
+                        avgScorePr,
+                        zhengEffectPercent: zhengEffect !== null ? zhengEffect * 100 : null,
+                        yieldRatePercent: yieldRate !== null ? yieldRate * 100 : null,
+                        r_score: parseNumber(yearDept.r_score),
+                        avg_score: parseNumber(yearDept.avg_score),
+                        name: yearDept.name,
+                        id: yearDept.id,
+                        x: mode === 'rscore_avg' ? rScorePr : (zhengEffect !== null ? zhengEffect * 100 : null),
+                        y: mode === 'rscore_avg' ? avgScorePr : (yieldRate !== null ? yieldRate * 100 : null)
+                    };
+                })
+                .filter(point => point && point.x !== null && point.y !== null);
+
+            pathPoints.sort((a, b) => {
+                const numA = parseInt(a.year.replace(/\D/g, ''), 10) || 0;
+                const numB = parseInt(b.year.replace(/\D/g, ''), 10) || 0;
+                return numA - numB;
+            });
+
+            return pathPoints;
+        };
+    }, [allYearsRankings, rankings, processedRankings, selectedDimension, mode]);
+
+    const historicalPath = useMemo(() => {
+        return selectedDept ? getDeptPath(selectedDept) : [];
+    }, [selectedDept, getDeptPath]);
+
+    const comparedPaths = useMemo(() => {
+        return comparedDepts.map(id => ({
+            id,
+            path: getDeptPath(id)
+        }));
+    }, [comparedDepts, getDeptPath]);
+
+    const toggleCompareDept = (deptId) => {
+        if (deptId === selectedDept) return;
+        setComparedDepts(prev => {
+            if (prev.includes(deptId)) {
+                return prev.filter(id => id !== deptId);
+            }
+            if (prev.length >= 5) {
+                return [...prev.slice(1), deptId];
+            }
+            return [...prev, deptId];
+        });
+    };
 
     // Split points into current selection and the rest
     const otherPoints = finalChartData.filter(item => item.id !== selectedDept);
@@ -593,20 +543,6 @@ const PlacementQuadrantChart = ({
             ? getQuadrantRScoreAvg(currentDeptPoint.x, currentDeptPoint.y)
             : getQuadrantEffectYield(currentDeptPoint.x, currentDeptPoint.y))
         : null;
-
-    // Convert historicalPathRaw to specific mode coordinates
-    const historicalPath = historicalPathRaw
-        .map(point => {
-            const x = mode === 'rscore_avg' ? point.rScorePr : point.zhengEffectPercent;
-            const y = mode === 'rscore_avg' ? point.avgScorePr : point.yieldRatePercent;
-            if (x === null || y === null) return null;
-            return {
-                ...point,
-                x,
-                y
-            };
-        })
-        .filter(Boolean);
 
     // Generate YoY movement analysis
     const generateTrendAnalysis = (path, currentMode) => {
@@ -681,12 +617,14 @@ const PlacementQuadrantChart = ({
     if (mode === 'rscore_avg') {
         const allX = [
             ...finalChartData.map(d => d.x),
-            ...historicalPath.map(d => d.x)
+            ...historicalPath.map(d => d.x),
+            ...comparedPaths.flatMap(p => p.path.map(d => d.x))
         ].filter(val => val !== null && val !== undefined);
 
         const allY = [
             ...finalChartData.map(d => d.y),
-            ...historicalPath.map(d => d.y)
+            ...historicalPath.map(d => d.y),
+            ...comparedPaths.flatMap(p => p.path.map(d => d.y))
         ].filter(val => val !== null && val !== undefined);
 
         const minX = allX.length > 0 ? Math.min(...allX) : 0;
@@ -910,11 +848,33 @@ const PlacementQuadrantChart = ({
                         <Scatter
                             name="其他校系"
                             data={otherPoints}
-                            fill="#64748b"
-                            fillOpacity={0.6}
-                            shape="circle"
                             legendType="none"
                             isAnimationActive={false}
+                            style={{ cursor: 'pointer' }}
+                            onClick={(node) => {
+                                if (node && node.id) {
+                                    toggleCompareDept(node.id);
+                                }
+                            }}
+                            shape={(props) => {
+                                const { cx, cy, payload } = props;
+                                const compareIdx = comparedDepts.indexOf(payload.id);
+                                const isCompared = compareIdx !== -1;
+                                const fill = isCompared ? COMPARE_COLORS[compareIdx % COMPARE_COLORS.length] : '#94a3b8';
+                                const opacity = isCompared ? 0.95 : 0.6;
+                                const radius = isCompared ? 7 : 4.5;
+                                return (
+                                    <circle
+                                        cx={cx}
+                                        cy={cy}
+                                        r={radius}
+                                        fill={fill}
+                                        fillOpacity={opacity}
+                                        stroke={isCompared ? '#fff' : 'none'}
+                                        strokeWidth={isCompared ? 1.5 : 0}
+                                    />
+                                );
+                            }}
                         />
 
                         {/* Connected line & markers for historical path */}
@@ -946,6 +906,41 @@ const PlacementQuadrantChart = ({
                                 isAnimationActive={false}
                             />
                         )}
+
+                        {/* Connected line & markers for compared competitor paths */}
+                        {comparedPaths.map(({ id, path }, index) => {
+                            if (path.length < 2) return null;
+                            const color = COMPARE_COLORS[index % COMPARE_COLORS.length];
+                            return (
+                                <Scatter
+                                    key={`compare-path-${id}`}
+                                    name={`對手軌跡-${index + 1}`}
+                                    data={path}
+                                    fill={color}
+                                    line={{ stroke: color, strokeWidth: 2, strokeDasharray: '4 4' }}
+                                    shape={(props) => {
+                                        const { cx, cy, payload } = props;
+                                        return (
+                                            <g key={`comp-${id}-point-${payload.year}`}>
+                                                <circle cx={cx} cy={cy} r={4.5} fill={color} stroke="#fff" strokeWidth={1} />
+                                                <text
+                                                    x={cx + 8}
+                                                    y={cy + 4}
+                                                    fontSize={10}
+                                                    fontWeight="bold"
+                                                    fill={color}
+                                                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                                                >
+                                                    {payload.year}
+                                                </text>
+                                            </g>
+                                        );
+                                    }}
+                                    legendType="none"
+                                    isAnimationActive={false}
+                                />
+                            );
+                        })}
 
                         {/* Highlighted current selection */}
                         {currentDeptPoint && (
@@ -983,6 +978,66 @@ const PlacementQuadrantChart = ({
                     marginBottom: '15px'
                 }}>
                     ℹ️ 目前僅找到本校系組資料，尚無直接競爭或流動關係校系組可供比較。
+                </div>
+            )}
+
+            {/*對手軌跡比對控制區*/}
+            {otherPoints.length > 0 && (
+                <div style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '10px', userSelect: 'none' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <h4 style={{ margin: 0, color: '#2c3e50', fontSize: '14px', fontWeight: 'bold' }}>
+                            🔍 對手軌跡比對（點擊或勾選，最多顯示 5 個）
+                        </h4>
+                        {comparedDepts.length > 0 && (
+                            <button
+                                onClick={() => setComparedDepts([])}
+                                style={{ fontSize: '11px', padding: '2px 8px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#64748b', transition: 'all 0.2s' }}
+                            >
+                                清除選擇
+                            </button>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {otherPoints.map((dept) => {
+                            const compareIdx = comparedDepts.indexOf(dept.id);
+                            const isCompared = compareIdx !== -1;
+                            const color = isCompared ? COMPARE_COLORS[compareIdx % COMPARE_COLORS.length] : '#cbd5e1';
+                            const badgeBg = isCompared ? `${color}15` : '#fff';
+                            const badgeColor = isCompared ? color : '#475569';
+                            const borderStyle = isCompared ? `1.5px solid ${color}` : '1px solid #e2e8f0';
+
+                            return (
+                                <button
+                                    key={dept.id}
+                                    onClick={() => toggleCompareDept(dept.id)}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '12px',
+                                        padding: '6px 12px',
+                                        cursor: 'pointer',
+                                        borderRadius: '20px',
+                                        border: borderStyle,
+                                        backgroundColor: badgeBg,
+                                        color: badgeColor,
+                                        fontWeight: isCompared ? 'bold' : 'normal',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: isCompared ? '0 2px 6px rgba(0,0,0,0.05)' : 'none'
+                                    }}
+                                >
+                                    <span style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        backgroundColor: isCompared ? color : '#cbd5e1',
+                                        display: 'inline-block'
+                                    }} />
+                                    {dept.name.replace(/\n/g, ' ')}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>

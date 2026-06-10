@@ -4,7 +4,7 @@ const normalizeName = (name) => {
     return (name || "").replace(/\n/g, '').replace(/\s+/g, '').trim();
 };
 
-const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLabel }) => {
+const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLabel, currentYear, setSelectedYear }) => {
     // 幻燈片當前頁面的索引值 (0 代表起始學年度)
     const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -115,6 +115,24 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
         }
     }, [timelineNodes, currentIndex]);
 
+    // 同步焦點年度到時間軸索引
+    useEffect(() => {
+        if (!currentYear || !timelineRankData || timelineRankData.length === 0) return;
+        const index = timelineRankData.findIndex(data => data.year.replace('學年', '') === currentYear);
+        if (index !== -1) {
+            setCurrentIndex(index);
+        }
+    }, [currentYear, timelineRankData]);
+
+    const handleYearChange = (newIndex) => {
+        if (newIndex < 0 || newIndex >= timelineNodes.length) return;
+        setCurrentIndex(newIndex);
+        const newYearStr = timelineNodes[newIndex]?.year; // 例如 "112學年"
+        if (newYearStr && setSelectedYear) {
+            setSelectedYear(newYearStr.replace('學年', ''));
+        }
+    };
+
     if (!timelineRankData || timelineRankData.length === 0 || timelineNodes.length === 0) {
         return <div style={{ padding: '20px', textAlign: 'center' }}>📊 正在計算競爭力時間軸...</div>;
     }
@@ -132,7 +150,7 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '25px' }}>
                 <button
                     disabled={currentIndex === 0}
-                    onClick={() => setCurrentIndex(prev => prev - 1)}
+                    onClick={() => handleYearChange(currentIndex - 1)}
                     style={{
                         padding: '8px 16px',
                         borderRadius: '20px',
@@ -152,7 +170,7 @@ const CompetitionTimeline = ({ timelineRankData, trendDepts, selectedDept, myLab
                 </span>
                 <button
                     disabled={currentIndex === timelineNodes.length - 1}
-                    onClick={() => setCurrentIndex(prev => prev + 1)}
+                    onClick={() => handleYearChange(currentIndex + 1)}
                     style={{
                         padding: '8px 16px',
                         borderRadius: '20px',

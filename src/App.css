@@ -924,4 +924,13 @@ thead {
   height: 1px;
   background: linear-gradient(to right, #e2e8f0, rgba(226, 232, 240, 0.2));
   margin: 24px 0;
+}
+
+/* 移除 Recharts 圖表點擊時產生的預設黑框/外框 */
+.recharts-wrapper,
+.recharts-wrapper:focus,
+.recharts-wrapper *:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }

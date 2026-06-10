@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList, ReferenceLine } from 'recharts';
 
 const COLORS = [
     '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#34495e', '#d35400',
@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType, currentDeptInfo, historicalData, singleRScoreTicks, singleAvgTicks, singleFlowTicks, rScoreTicks, avgTicks, trendDepts, selectedDept, myLabel }) => {
+const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType, currentDeptInfo, historicalData, singleRScoreTicks, singleAvgTicks, singleFlowTicks, rScoreTicks, avgTicks, trendDepts, selectedDept, myLabel, currentYear, setSelectedYear }) => {
     const [localTrendType, setLocalTrendType] = useState('rscore_avgscore');
     const trendType = propsTrendType !== undefined ? propsTrendType : localTrendType;
     const setTrendType = propsSetTrendType !== undefined ? propsSetTrendType : setLocalTrendType;
@@ -108,9 +108,30 @@ const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType
             {/* 圖表渲染區 */}
             <div style={{ width: '100%', height: '400px', flexShrink: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={historicalData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
+                    <ComposedChart
+                        data={historicalData}
+                        margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(state) => {
+                            if (state && state.activeLabel) {
+                                const clickedYear = state.activeLabel.replace('學年', '');
+                                if (setSelectedYear) {
+                                    setSelectedYear(clickedYear);
+                                }
+                            }
+                        }}
+                    >
                         <CartesianGrid strokeDasharray="3 3" vertical={true} />
                         <XAxis dataKey="name" tickMargin={10} />
+                        {currentYear && (
+                            <ReferenceLine
+                                x={`${currentYear}學年`}
+                                stroke="#e74c3c"
+                                strokeWidth={2}
+                                strokeDasharray="3 3"
+                                label={{ value: '當前焦點', position: 'top', fill: '#e74c3c', fontSize: 11, fontWeight: 'bold' }}
+                            />
+                        )}
 
                         {trendType === 'flow_pr' ? (
                             <>
