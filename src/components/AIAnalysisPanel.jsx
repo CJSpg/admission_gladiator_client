@@ -876,8 +876,8 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
     // instead of showing the skeleton, which prevents the flicker effect during re-rendering/scrolling.
     const hasAnalysis = activeEntry?.status === 'success';
     const isLoading = !hasAnalysis && (!isDataReady || (activeEntry ? activeEntry.status === 'loading' : true));
-    const error = isDataReady && activeEntry?.status === 'error' ? activeEntry.error : '';
-    const analysis = isDataReady && activeEntry?.status === 'success' ? activeEntry.text : '';
+    const error = activeEntry?.status === 'error' ? activeEntry.error : '';
+    const analysis = activeEntry?.status === 'success' ? activeEntry.text : '';
 
     const getTitleIcon = () => {
         switch (activeTab) {
