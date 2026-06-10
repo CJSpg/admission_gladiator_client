@@ -717,7 +717,7 @@ ${healthItems.join('\n')}
 
 四象限定位標準（113學年）：
 - **R-Score PR（品牌競爭百分等級）**: ${currentRPr} (中位數為 50)
-- **平均分數 PR（考生成績百分等級）**: ${currentAPr} (中位數為 50)
+- **最低錄取平均分數 PR（考生成績百分等級）**: ${currentAPr} (中位數為 50)
 
 歷年分數與實力消長路徑：
 ${pathPoints.join('\n')}

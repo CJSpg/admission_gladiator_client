@@ -236,7 +236,7 @@ const CustomTooltip = ({ active, payload, selectedDept, mode }) => {
                         <div>⚡ R-Score：<strong>{data.r_score != null ? data.r_score.toFixed(3) : '--'}</strong></div>
                         <div>📊 R-Score PR：<strong style={{ color: '#3498db' }}>{rScorePr != null ? rScorePr.toFixed(1) : '--'}</strong></div>
                         <div>📝 平均分數：<strong>{data.avg_score != null ? data.avg_score.toFixed(3) : '--'}</strong></div>
-                        <div>⭐ 平均分數 PR：<strong style={{ color: '#2ecc71' }}>{avgScorePr != null ? avgScorePr.toFixed(1) : '--'}</strong></div>
+                        <div>⭐ 最低錄取平均分數 PR：<strong style={{ color: '#2ecc71' }}>{avgScorePr != null ? avgScorePr.toFixed(1) : '--'}</strong></div>
                         {isSelf ? (
                             <div style={{ color: '#ef4444', fontWeight: 'bold', marginTop: '4px' }}>📍 目前選取校系組</div>
                         ) : (
@@ -544,7 +544,7 @@ const PlacementQuadrantChart = ({
                 return (
                     <div className="chart-wrapper" style={{ padding: '30px', textAlign: 'center', color: '#7f8c8d' }}>
                         <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '18px', fontWeight: 'bold' }}>
-                            R-Score 與平均分數 PR 四象限落點分析
+                            R-Score 與最低錄取平均分數 PR 四象限落點分析
                         </h3>
                         <p style={{ fontSize: '14px', color: '#95a5a6' }}>
                             目前選取校系組缺少 R-Score 或平均分數資料，無法進行落點分析。
@@ -725,7 +725,7 @@ const PlacementQuadrantChart = ({
             {/* Header info */}
             <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                 <h3 style={{ margin: '0 0 5px 0', fontSize: '18px', color: '#2c3e50', fontWeight: 'bold' }}>
-                    {mode === 'rscore_avg' ? "R-Score 與平均分數 PR 分佈落點分析" : "正取有效性與報到率四象限分析"}
+                    {mode === 'rscore_avg' ? "R-Score 與最低錄取平均分數 PR 分佈落點分析" : "正取有效性與報到率四象限分析"}
                 </h3>
                 <p style={{ margin: 0, fontSize: '13px', color: '#7f8c8d', lineHeight: '1.5' }}>
                     {mode === 'rscore_avg'
@@ -751,7 +751,7 @@ const PlacementQuadrantChart = ({
                         boxShadow: mode === 'rscore_avg' ? '0 4px 12px rgba(231, 76, 60, 0.2)' : 'none'
                     }}
                 >
-                    📍 R-Score 與平均分數 PR
+                    📍 R-Score 與最低錄取平均分數 PR
                 </button>
                 <button
                     onClick={() => setMode('effect_yield')}
@@ -817,13 +817,13 @@ const PlacementQuadrantChart = ({
                         <YAxis
                             type="number"
                             dataKey="y"
-                            name={mode === 'rscore_avg' ? "平均分數 PR" : "報到率"}
+                            name={mode === 'rscore_avg' ? "最低錄取平均分數 PR" : "報到率"}
                             domain={yDomain}
                             ticks={yTicks}
                             tickFormatter={(v) => mode === 'rscore_avg' ? Math.round(v) : `${Math.round(v)}%`}
                             tick={{ fontSize: 11, fill: '#64748b' }}
                             label={{
-                                value: mode === 'rscore_avg' ? '平均分數 PR' : '報到率（%）',
+                                value: mode === 'rscore_avg' ? '最低錄取平均分數 PR' : '報到率（%）',
                                 angle: -90,
                                 position: 'insideLeft',
                                 offset: 0,
@@ -914,6 +914,7 @@ const PlacementQuadrantChart = ({
                             fillOpacity={0.6}
                             shape="circle"
                             legendType="none"
+                            isAnimationActive={false}
                         />
 
                         {/* Connected line & markers for historical path */}
@@ -942,6 +943,7 @@ const PlacementQuadrantChart = ({
                                     );
                                 }}
                                 legendType="none"
+                                isAnimationActive={false}
                             />
                         )}
 
@@ -961,6 +963,7 @@ const PlacementQuadrantChart = ({
                                     );
                                 }}
                                 legendType="none"
+                                isAnimationActive={false}
                             />
                         )}
                     </ScatterChart>

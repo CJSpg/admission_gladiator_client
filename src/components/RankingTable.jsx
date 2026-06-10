@@ -108,10 +108,10 @@ const RankingTable = ({
                                 {selectedDimension === 'school' ? '學校' : selectedDimension === 'dept' ? '校系' : '系組'}
                             </th>
                             <th className="sortable-header" style={{ width: '12%', textAlign: 'left' }} onClick={() => requestSort('r_score')}>R-Score{getSortIcon('r_score')}</th>
-                            <th className="sortable-header" style={{ width: '12%', textAlign: 'left' }} onClick={() => requestSort('avg_score')}>錄取分數{getSortIcon('avg_score')}</th>
+                            <th className="sortable-header" style={{ width: '12%', textAlign: 'left' }} onClick={() => requestSort('avg_score')}>最低錄取平均分數{getSortIcon('avg_score')}</th>
                             <th className="sortable-header" style={{ width: '12%', textAlign: 'left' }} onClick={() => requestSort('yield_rate')}>報到率{getSortIcon('yield_rate')}</th>
                             <th className="sortable-header" style={{ width: '12%', textAlign: 'left' }} onClick={() => requestSort('zheng_effect')}>正取有效{getSortIcon('zheng_effect')}</th>
-                            <th className="sortable-header" style={{ width: '12%', textAlign: 'left' }} onClick={() => requestSort('flow_rate')}>登分比例{getSortIcon('flow_rate')}</th>
+                            <th className="sortable-header" style={{ width: '12%', textAlign: 'left' }} onClick={() => requestSort('flow_rate')}>流入登分比例{getSortIcon('flow_rate')}</th>
                         </tr>
                     </thead>
                     <tbody>

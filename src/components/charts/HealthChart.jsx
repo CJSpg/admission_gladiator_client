@@ -88,10 +88,10 @@ const HealthChart = ({ healthData }) => {
                         <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 12, fill: '#34495e' }} interval={0} />
                         <Tooltip content={<CustomBarTooltip />} cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
 
-                        <Bar dataKey="yield_rate" name="報到率" stackId="a" fill="#3498db" radius={[4, 4, 4, 4]} barSize={15} />
-                        <Bar dataKey="flow_rate" name="流入登分比例" stackId="a" fill="#e74c3c" radius={[4, 4, 4, 4]} barSize={15} />
+                        <Bar dataKey="yield_rate" name="報到率" stackId="a" fill="#3498db" radius={[4, 4, 4, 4]} barSize={15} isAnimationActive={false} />
+                        <Bar dataKey="flow_rate" name="流入登分比例" stackId="a" fill="#e74c3c" radius={[4, 4, 4, 4]} barSize={15} isAnimationActive={false} />
 
-                        <Bar dataKey="zheng_effect" name="正取有效性" fill="#2ecc71" radius={[4, 4, 4, 4]} barSize={15} />
+                        <Bar dataKey="zheng_effect" name="正取有效性" fill="#2ecc71" radius={[4, 4, 4, 4]} barSize={15} isAnimationActive={false} />
                     </BarChart>
                 </ResponsiveContainer>
             </div>

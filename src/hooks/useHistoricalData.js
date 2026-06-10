@@ -1,5 +1,89 @@
 import { useState, useEffect, useMemo } from 'react';
 
+// --- Percentile Rank Helper Functions ---
+const parseNumber = (val) => {
+    if (val === undefined || val === null || val === '--' || val === '') return null;
+    const str = String(val).trim().replace(/,/g, '');
+    const num = Number(str);
+    return Number.isFinite(num) ? num : null;
+};
+
+const calculatePercentileRank = (data, key, outputKey) => {
+    if (!data || data.length === 0) return [];
+    const result = data.map(item => ({ ...item, [outputKey]: null }));
+    const validItems = data
+        .map((item, index) => ({
+            originalIndex: index,
+            val: parseNumber(item[key])
+        }))
+        .filter(item => item.val !== null);
+
+    const N = validItems.length;
+    if (N === 0) return result;
+    if (N === 1) {
+        const itemIdx = validItems[0].originalIndex;
+        result[itemIdx][outputKey] = 100;
+        return result;
+    }
+
+    validItems.sort((a, b) => a.val - b.val);
+
+    let i = 0;
+    while (i < N) {
+        let j = i;
+        while (j < N && validItems[j].val === validItems[i].val) {
+            j++;
+        }
+        const avgRank = (i + 1 + j) / 2;
+        const pr = ((avgRank - 1) / (N - 1)) * 100;
+
+        for (let k = i; k < j; k++) {
+            validItems[k].pr = pr;
+        }
+        i = j;
+    }
+
+    validItems.forEach(item => {
+        result[item.originalIndex][outputKey] = Number(item.pr.toFixed(2));
+    });
+
+    return result;
+};
+
+const getGroupName = (name) => {
+    if (!name) return 'UNKNOWN';
+    const parts = name.split('\n');
+    return parts[2] ? parts[2].trim() : 'UNKNOWN';
+};
+
+const calculateAverageScorePercentileRank = (data, key, outputKey, dimension) => {
+    if (!data || data.length === 0) return [];
+    if (dimension !== 'group') {
+        return calculatePercentileRank(data, key, outputKey);
+    }
+    const groups = {};
+    data.forEach((item, index) => {
+        const grp = getGroupName(item.name);
+        if (!groups[grp]) {
+            groups[grp] = [];
+        }
+        groups[grp].push({ item, index });
+    });
+
+    const result = data.map(item => ({ ...item, [outputKey]: null }));
+
+    Object.keys(groups).forEach(grp => {
+        const groupItems = groups[grp].map(g => g.item);
+        const rankedGroupItems = calculatePercentileRank(groupItems, key, outputKey);
+
+        groups[grp].forEach((g, idx) => {
+            result[g.index][outputKey] = rankedGroupItems[idx][outputKey];
+        });
+    });
+
+    return result;
+};
+
 export const useHistoricalData = (selectedDept, selectedDimension, years, graphData, rankings) => {
     const [historicalData, setHistoricalData] = useState([]);
     const [trendDepts, setTrendDepts] = useState([]);
@@ -55,16 +139,27 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                 const trendData = results.map(({ year, rankingData }) => {
                     const yearData = { name: `${year}學年` };
 
+                    // Calculate percentile ranks for this year's rankings
+                    let processedRankings = [];
+                    if (rankingData && rankingData.length > 0) {
+                        const rScorePrData = calculatePercentileRank(rankingData, 'r_score', 'r_score_pr');
+                        processedRankings = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr', selectedDimension);
+                    }
+
                     targetIds.forEach(id => {
                         const currentFullName = targetNamesMap[id] || idToName[id];
                         const normalizedCurrentName = normalizeName(currentFullName);
-                        const deptData = (rankingData || []).find(d => normalizeName(d.name) === normalizedCurrentName);
+                        const deptData = processedRankings.find(d => normalizeName(d.name) === normalizedCurrentName);
                         if (deptData) {
                             yearData[`${id}_RScore`] = parseScore(deptData.r_score);
                             yearData[`${id}_AvgScore`] = parseScore(deptData.avg_score);
+                            yearData[`${id}_AvgScorePR`] = parseScore(deptData.avg_score_pr);
+                            yearData[`${id}_FlowRate`] = deptData.flow_rate !== undefined ? Number((parseScore(deptData.flow_rate) * 100).toFixed(1)) : null;
                         } else {
                             yearData[`${id}_RScore`] = null;
                             yearData[`${id}_AvgScore`] = null;
+                            yearData[`${id}_AvgScorePR`] = null;
+                            yearData[`${id}_FlowRate`] = null;
                         }
                     });
                     return yearData;
@@ -226,6 +321,49 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
         return { min: tickMin, max: tickMax, ticks };
     }, [historicalData, selectedDept]);
 
+    const singleFlowTicks = useMemo(() => {
+        if (!historicalData.length || !selectedDept) return { ticks: [0, 25, 50, 75, 100] };
+        let min = Infinity, max = -Infinity;
+        historicalData.forEach(d => {
+            const val = d[`${selectedDept}_FlowRate`];
+            if (val != null) {
+                min = Math.min(min, val);
+                max = Math.max(max, val);
+            }
+        });
+        if (min === Infinity) return { ticks: [0, 25, 50, 75, 100] };
+
+        // 上限多5, 下限多5
+        let tickMin = Math.max(0, Math.floor((min - 5) / 5) * 5);
+        let tickMax = Math.min(100, Math.ceil((max + 5) / 5) * 5);
+
+        // 如果數值完全相同
+        if (tickMin === tickMax) {
+            const adjustedMin = Math.max(0, tickMin - 10);
+            const adjustedMax = Math.min(100, tickMax + 10);
+            const ticks = [];
+            const step = (adjustedMax - adjustedMin) / 4;
+            for (let i = adjustedMin; i <= adjustedMax; i += step) {
+                ticks.push(Math.round(i));
+            }
+            return { min: adjustedMin, max: adjustedMax, ticks };
+        }
+
+        const diff = tickMax - tickMin;
+        let step = 5;
+        if (diff > 40) {
+            tickMin = Math.max(0, Math.floor((min - 5) / 10) * 10);
+            tickMax = Math.min(100, Math.ceil((max + 5) / 10) * 10);
+            step = 10;
+        }
+
+        const ticks = [];
+        for (let i = tickMin; i <= tickMax; i += step) {
+            ticks.push(i);
+        }
+        return { min: tickMin, max: tickMax, ticks };
+    }, [historicalData, selectedDept]);
+
     // 4. 定位圖資料
     const scatterPlotData = useMemo(() => {
         if (rankings.length < 5) return [];
@@ -262,6 +400,7 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
         rScoreTicks,
         singleRScoreTicks,
         singleAvgTicks,
+        singleFlowTicks,
         scatterPlotData,
         healthData,
         timelineRankData

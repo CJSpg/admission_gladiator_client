@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 const COLORS = [
     '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#34495e', '#d35400',
@@ -15,7 +15,9 @@ const CustomTooltip = ({ active, payload, label }) => {
                     <div key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
                         <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: entry.color, marginRight: '8px', flexShrink: 0 }} />
                         <span style={{ color: '#555', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '10px' }}>{entry.name}</span>
-                        <span style={{ fontWeight: 'bold', color: entry.color }}>{entry.value}</span>
+                        <span style={{ fontWeight: 'bold', color: entry.color }}>
+                            {entry.name === '流入登分比例' ? `${entry.value}%` : entry.value}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -24,11 +26,33 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType, currentDeptInfo, historicalData, singleRScoreTicks, singleAvgTicks, rScoreTicks, avgTicks, trendDepts, selectedDept, myLabel }) => {
+const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType, currentDeptInfo, historicalData, singleRScoreTicks, singleAvgTicks, singleFlowTicks, rScoreTicks, avgTicks, trendDepts, selectedDept, myLabel }) => {
     const [localTrendType, setLocalTrendType] = useState('rscore_avgscore');
     const trendType = propsTrendType !== undefined ? propsTrendType : localTrendType;
     const setTrendType = propsSetTrendType !== undefined ? propsSetTrendType : setLocalTrendType;
     const [hiddenLines, setHiddenLines] = useState([]);
+
+    const renderYoYLabel = (props) => {
+        const { x, y, value, index } = props;
+        if (index === 0 || value === null || value === undefined) return null;
+        const prevVal = historicalData[index - 1]?.[`${selectedDept}_FlowRate`];
+        if (prevVal === null || prevVal === undefined) return null;
+        const diff = value - prevVal;
+        const isPositive = diff >= 0;
+        const diffText = `${isPositive ? '+' : ''}${diff.toFixed(1)}%`;
+        return (
+            <text
+                x={x - 45}
+                y={y - 15}
+                fill={isPositive ? '#e74c3c' : '#2ecc71'}
+                fontSize="12px"
+                fontWeight="bold"
+                textAnchor="middle"
+            >
+                {diffText}
+            </text>
+        );
+    };
 
     // 💡 自動優化邏輯：當競爭對手改變時，預設只顯示前 5 名（不包含當前校系）
     useEffect(() => {
@@ -61,8 +85,9 @@ const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType
             {/* 趨勢類型切換 */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' }}>
                 <button onClick={() => setTrendType('rscore_avgscore')} style={{ padding: '8px 20px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', border: trendType === 'rscore_avgscore' ? 'none' : '1px solid #2ecc71', backgroundColor: trendType === 'rscore_avgscore' ? '#2ecc71' : '#fff', color: trendType === 'rscore_avgscore' ? '#fff' : '#2ecc71' }}>📈 綜合趨勢</button>
+                <button onClick={() => setTrendType('flow_pr')} style={{ padding: '8px 20px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', border: trendType === 'flow_pr' ? 'none' : '1px solid #e67e22', backgroundColor: trendType === 'flow_pr' ? '#e67e22' : '#fff', color: trendType === 'flow_pr' ? '#fff' : '#e67e22' }}>▼ 缺額落點分析</button>
                 <button onClick={() => setTrendType('rscore')} style={{ padding: '8px 20px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', border: trendType === 'rscore' ? 'none' : '1px solid #e74c3c', backgroundColor: trendType === 'rscore' ? '#e74c3c' : '#fff', color: trendType === 'rscore' ? '#fff' : '#e74c3c' }}>⭐ R-Score</button>
-                <button onClick={() => setTrendType('avgscore')} style={{ padding: '8px 20px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', border: trendType === 'avgscore' ? 'none' : '1px solid #3498db', backgroundColor: trendType === 'avgscore' ? '#3498db' : '#fff', color: trendType === 'avgscore' ? '#fff' : '#3498db' }}>📊 錄取分數</button>
+                <button onClick={() => setTrendType('avgscore')} style={{ padding: '8px 20px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', border: trendType === 'avgscore' ? 'none' : '1px solid #3498db', backgroundColor: trendType === 'avgscore' ? '#3498db' : '#fff', color: trendType === 'avgscore' ? '#fff' : '#3498db' }}>📊 最低錄取平均分數</button>
             </div>
 
             {/* 綜合趨勢 */}
@@ -70,24 +95,74 @@ const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType
                 <h3 style={{ marginBottom: '15px' }}>📈 {currentDeptInfo.name.replace(/\n/g, ' ')} 歷年競爭力趨勢</h3>
             )}
 
+            {/* 缺額落點分析 */}
+            {trendType === 'flow_pr' && currentDeptInfo && (
+                <h3 style={{ marginBottom: '15px' }}>📈 {currentDeptInfo.name.replace(/\n/g, ' ')} 流入登分比例與最低錄取平均分數 PR 關係</h3>
+            )}
+
             {/* R-Score 或 分數趨勢 */}
-            {trendType !== 'rscore_avgscore' && (
-                <h3 style={{ marginBottom: '15px' }}>📈 歷年 {trendType === 'rscore' ? 'R-Score' : '錄取分數'} 趨勢 ({myLabel} vs 競爭對手)</h3>
+            {trendType !== 'rscore_avgscore' && trendType !== 'flow_pr' && (
+                <h3 style={{ marginBottom: '15px' }}>📈 歷年 {trendType === 'rscore' ? 'R-Score' : '最低錄取平均分數'} 趨勢 ({myLabel} vs 競爭對手)</h3>
             )}
 
             {/* 圖表渲染區 */}
             <div style={{ width: '100%', height: '400px', flexShrink: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={historicalData} margin={{ top: 15, right: 30, left: 0, bottom: 5 }}>
+                    <ComposedChart data={historicalData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={true} />
                         <XAxis dataKey="name" tickMargin={10} />
 
-                        {trendType === 'rscore_avgscore' ? (
+                        {trendType === 'flow_pr' ? (
+                            <>
+                                <YAxis
+                                    yAxisId="left"
+                                    domain={[0, 100]}
+                                    ticks={[0, 25, 50, 75, 100]}
+                                    tick={{ fontSize: 12, fill: '#2ecc71' }}
+                                    axisLine={{ stroke: '#2ecc71' }}
+                                    tickLine={{ stroke: '#2ecc71' }}
+                                    label={{ value: '最低錄取平均分數 PR', angle: -90, position: 'insideLeft', offset: 15, style: { fill: '#2ecc71', fontWeight: 'bold' } }}
+                                />
+                                <YAxis
+                                    yAxisId="right"
+                                    orientation="right"
+                                    domain={[singleFlowTicks.min, singleFlowTicks.max]}
+                                    ticks={singleFlowTicks.ticks}
+                                    tick={{ fontSize: 12, fill: '#e74c3c' }}
+                                    axisLine={{ stroke: '#e74c3c' }}
+                                    tickLine={{ stroke: '#e74c3c' }}
+                                    tickFormatter={(v) => `${v}%`}
+                                    label={{ value: '流入登分比例 (%)', angle: 90, position: 'insideRight', offset: 15, style: { fill: '#e74c3c', fontWeight: 'bold' } }}
+                                />
+                                <Bar
+                                    yAxisId="left"
+                                    dataKey={`${selectedDept}_AvgScorePR`}
+                                    name="最低錄取平均分數 PR"
+                                    fill="#2ecc71"
+                                    barSize={40}
+                                    isAnimationActive={false}
+                                >
+                                    <LabelList dataKey={`${selectedDept}_AvgScorePR`} position="top" style={{ fill: '#333', fontWeight: 'bold', fontSize: 12 }} />
+                                </Bar>
+                                <Line
+                                    yAxisId="right"
+                                    type="monotone"
+                                    dataKey={`${selectedDept}_FlowRate`}
+                                    name="流入登分比例"
+                                    stroke="#e74c3c"
+                                    strokeWidth={4}
+                                    activeDot={{ r: 8 }}
+                                    isAnimationActive={false}
+                                >
+                                    <LabelList content={renderYoYLabel} />
+                                </Line>
+                            </>
+                        ) : trendType === 'rscore_avgscore' ? (
                             <>
                                 <YAxis yAxisId="left" domain={[singleRScoreTicks.min, singleRScoreTicks.max]} ticks={singleRScoreTicks.ticks} tick={{ fontSize: 12 }} />
                                 <YAxis yAxisId="right" orientation="right" domain={[singleAvgTicks.min, singleAvgTicks.max]} ticks={singleAvgTicks.ticks} tick={{ fontSize: 12 }} />
-                                <Line yAxisId="left" type="monotone" dataKey={`${selectedDept}_RScore`} name={`R-Score`} stroke="#e74c3c" strokeWidth={4} />
-                                <Line yAxisId="right" type="monotone" dataKey={`${selectedDept}_AvgScore`} name={`錄取分數`} stroke="#3498db" strokeWidth={4} />
+                                <Line yAxisId="left" type="monotone" dataKey={`${selectedDept}_RScore`} name={`R-Score`} stroke="#e74c3c" strokeWidth={4} isAnimationActive={false} />
+                                <Line yAxisId="right" type="monotone" dataKey={`${selectedDept}_AvgScore`} name={`最低錄取平均分數`} stroke="#3498db" strokeWidth={4} isAnimationActive={false} />
                             </>
                         ) : (
                             <>
@@ -105,17 +180,21 @@ const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType
                                         stroke={dept.id === selectedDept ? '#e74c3c' : COLORS[i % COLORS.length]}
                                         strokeWidth={dept.id === selectedDept ? 4 : 2}
                                         dot={dept.id === selectedDept}
+                                        isAnimationActive={false}
                                     />
                                 ))}
                             </>
                         )}
                         <Tooltip content={<CustomTooltip />} />
-                    </LineChart>
+                        {(trendType === 'rscore_avgscore' || trendType === 'flow_pr') && (
+                            <Legend verticalAlign="top" height={36} />
+                        )}
+                    </ComposedChart>
                 </ResponsiveContainer>
             </div>
 
             {/* 💡 互動圖例區 */}
-            {trendType !== 'rscore_avgscore' && (
+            {trendType !== 'rscore_avgscore' && trendType !== 'flow_pr' && (
                 <div style={{ marginTop: '30px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '10px', userSelect: 'none' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                         <h4 style={{ margin: 0, color: '#2c3e50' }}>校系對照（點擊可切換顯示）</h4>
