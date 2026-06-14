@@ -24,7 +24,7 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
     // 把資料算好
     const {
         historicalData, trendDepts, currentDeptInfo, avgTicks, rScoreTicks,
-        singleRScoreTicks, singleAvgTicks, singleFlowTicks, healthData, timelineRankData
+        singleRScoreTicks, singleAvgTicks, healthData, timelineRankData
     } = useHistoricalData(selectedDept, selectedDimension, years, graphData, rankings);
 
     const dimensionText = selectedDimension === 'school' ? '校' : selectedDimension === 'group' ? '系組' : '系';
@@ -83,7 +83,6 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                                 currentDeptInfo={currentDeptInfo}
                                 singleRScoreTicks={singleRScoreTicks}
                                 singleAvgTicks={singleAvgTicks}
-                                singleFlowTicks={singleFlowTicks}
                                 rScoreTicks={rScoreTicks}
                                 avgTicks={avgTicks}
                                 selectedDimension={selectedDimension}

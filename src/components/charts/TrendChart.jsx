@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType, currentDeptInfo, historicalData, singleRScoreTicks, singleAvgTicks, singleFlowTicks, rScoreTicks, avgTicks, trendDepts, selectedDept, myLabel, currentYear, setSelectedYear }) => {
+const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType, currentDeptInfo, historicalData, singleRScoreTicks, singleAvgTicks, rScoreTicks, avgTicks, trendDepts, selectedDept, myLabel, currentYear, setSelectedYear }) => {
     const [localTrendType, setLocalTrendType] = useState('rscore_avgscore');
     const trendType = propsTrendType !== undefined ? propsTrendType : localTrendType;
     const setTrendType = propsSetTrendType !== undefined ? propsSetTrendType : setLocalTrendType;
@@ -147,8 +147,8 @@ const TrendChart = ({ trendType: propsTrendType, setTrendType: propsSetTrendType
                                 <YAxis
                                     yAxisId="right"
                                     orientation="right"
-                                    domain={[singleFlowTicks.min, singleFlowTicks.max]}
-                                    ticks={singleFlowTicks.ticks}
+                                    domain={[0, 100]}
+                                    ticks={[0, 25, 50, 75, 100]}
                                     tick={{ fontSize: 12, fill: '#e74c3c' }}
                                     axisLine={{ stroke: '#e74c3c' }}
                                     tickLine={{ stroke: '#e74c3c' }}
