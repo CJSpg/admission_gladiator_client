@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const ANALYSIS_PROMPT_VERSION = 'screening-overlap-2026-06-17-v3';
+
 // --- Helper Functions (replicating calculations for prompt construction) ---
 const parseNumber = (val) => {
     if (val === undefined || val === null || val === '--' || val === '') return null;
@@ -459,8 +461,8 @@ const AIAnalysisPanel = ({
                 const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
                 const targetRankingInfo = rankings.find(r => r.id === selectedDept);
                 const targetNameForLookup = getCleanName(targetRankingInfo) || targetName;
-                const targetHealthInfo = findHealthInfoByName(targetNameForLookup);
                 const targetScreeningSource = getScreeningSourceByName(targetNameForLookup, targetRankingInfo);
+                const targetOverlapSource = targetRankingInfo || targetScreeningSource;
                 const targetScreening = getScreeningTextForItem(targetScreeningSource);
 
                 const formatEdge = (edge, direction) => {
@@ -469,8 +471,9 @@ const AIAnalysisPanel = ({
                     const compName = getCleanName(compRankingInfo) || compId;
                     const compHealthInfo = findHealthInfoByName(compName);
                     const compScreeningSource = getScreeningSourceByName(compName, compRankingInfo);
+                    const compOverlapSource = compRankingInfo || compScreeningSource;
                     const compScreening = getScreeningTextForItem(compScreeningSource);
-                    const screeningOverlap = formatScreeningOverlap(targetScreeningSource, compScreeningSource);
+                    const screeningOverlap = formatScreeningOverlap(targetOverlapSource, compOverlapSource);
                     const compRScore = compRankingInfo?.r_score ?? 'N/A';
                     const compAvgScore = compRankingInfo?.avg_score ?? 'N/A';
                     const compHealthText = formatHealthText(compHealthInfo);
@@ -534,6 +537,7 @@ ${analysisWritingRules}`;
                 const targetRankingInfo = rankings.find(r => r.id === selectedDept);
                 const targetNameForLookup = getCleanName(targetRankingInfo) || targetName;
                 const targetScreeningSource = getScreeningSourceByName(targetNameForLookup, targetRankingInfo);
+                const targetOverlapSource = targetRankingInfo || targetScreeningSource;
                 const targetScreening = getScreeningText(targetScreeningSource);
 
                 const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
@@ -553,8 +557,9 @@ ${analysisWritingRules}`;
                     const compRankingInfo = rankings.find(r => r.id === compId);
                     const compNameForLookup = getCleanName(compRankingInfo);
                     const compScreeningSource = getScreeningSourceByName(compNameForLookup, compRankingInfo);
+                    const compOverlapSource = compRankingInfo || compScreeningSource;
                     const compScreening = getScreeningText(compScreeningSource);
-                    const screeningOverlap = formatScreeningOverlap(targetScreeningSource, compScreeningSource);
+                    const screeningOverlap = formatScreeningOverlap(targetOverlapSource, compOverlapSource);
 
                     if (edge.drawn) {
                         draws.push(`- 與【${edge.from === selectedDept ? toName : fromName}】雙方都沒選（同時錄取學生最後兩邊都沒選）：${edge.value || 0} 人 [對手${compScreening}；與本校一階重合 = ${screeningOverlap}]`);
@@ -961,6 +966,7 @@ ${disappearedCompText}
                 const targetRankingInfo = rankings.find(r => r.id === selectedDept);
                 const targetNameForLookup = getCleanName(targetRankingInfo) || targetName;
                 const targetScreeningSource = getScreeningSourceByName(targetNameForLookup, targetRankingInfo);
+                const targetOverlapSource = targetRankingInfo || targetScreeningSource;
                 const targetScreening = getScreeningText(targetScreeningSource);
 
                 const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
@@ -980,8 +986,9 @@ ${disappearedCompText}
                     const compRankingInfo = rankings.find(r => r.id === compId);
                     const compNameForLookup = getCleanName(compRankingInfo);
                     const compScreeningSource = getScreeningSourceByName(compNameForLookup, compRankingInfo);
+                    const compOverlapSource = compRankingInfo || compScreeningSource;
                     const compScreening = getScreeningText(compScreeningSource);
-                    const screeningOverlap = formatScreeningOverlap(targetScreeningSource, compScreeningSource);
+                    const screeningOverlap = formatScreeningOverlap(targetOverlapSource, compOverlapSource);
 
                     if (edge.from === selectedDept) {
                         outflowDetails.push(`  - 流失至【${toName}】：${edge.value || 0} 人 [對手${compScreening}；與本校一階重合 = ${screeningOverlap}]`);
@@ -1076,7 +1083,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
     useEffect(() => {
         if (!isDataReady) return;
 
-        const prefix = `${currentYear}_${selectedDimension}_${selectedDept}_${zhengEffectThreshold}_${yieldRateThreshold}`;
+        const prefix = `${ANALYSIS_PROMPT_VERSION}_${currentYear}_${selectedDimension}_${selectedDept}_${zhengEffectThreshold}_${yieldRateThreshold}`;
         if (firedPrefixRef.current === prefix) return;
         firedPrefixRef.current = prefix;
 
@@ -1140,7 +1147,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
     }, [isDataReady, selectedDept, currentYear, selectedDimension, historicalData, rankings, graphData, healthData, timelineRankData, zhengEffectThreshold, yieldRateThreshold]);
 
     const getActiveKey = () => {
-        const prefix = `${currentYear}_${selectedDimension}_${selectedDept}_${zhengEffectThreshold}_${yieldRateThreshold}`;
+        const prefix = `${ANALYSIS_PROMPT_VERSION}_${currentYear}_${selectedDimension}_${selectedDept}_${zhengEffectThreshold}_${yieldRateThreshold}`;
         if (activeTab === 'trend') {
             return `${prefix}_trend_${trendType}`;
         }
