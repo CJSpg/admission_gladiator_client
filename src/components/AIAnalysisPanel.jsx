@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const ANALYSIS_PROMPT_VERSION = 'screening-overlap-2026-06-17-v3';
+const ANALYSIS_PROMPT_VERSION = 'screening-overlap-2026-06-17-v4';
 
 // --- Helper Functions (replicating calculations for prompt construction) ---
 const parseNumber = (val) => {
@@ -408,8 +408,21 @@ const AIAnalysisPanel = ({
                 return healthData.find(item => getCleanName(item) === cleanName) || null;
             };
 
+            const hasScreeningData = (item) => {
+                if (!item) return false;
+                if (item.first_stage_thresholds && item.first_stage_thresholds.length > 0) return true;
+                return !!(item.first_stage_groups && item.first_stage_groups.some(group =>
+                    group.first_stage_thresholds && group.first_stage_thresholds.length > 0
+                ));
+            };
+
             const getScreeningSourceByName = (name, fallbackItem = null) => {
-                return findHealthInfoByName(name) || findRankingInfoByName(name) || fallbackItem;
+                const healthInfo = findHealthInfoByName(name);
+                const rankingInfo = findRankingInfoByName(name);
+                if (hasScreeningData(rankingInfo)) return rankingInfo;
+                if (hasScreeningData(fallbackItem)) return fallbackItem;
+                if (hasScreeningData(healthInfo)) return healthInfo;
+                return rankingInfo || fallbackItem || healthInfo;
             };
 
             const getScreeningEntries = (item) => {
