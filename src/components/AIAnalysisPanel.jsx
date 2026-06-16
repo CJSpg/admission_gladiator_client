@@ -267,7 +267,8 @@ const AIAnalysisPanel = ({
     const isDataReady = !!(
         rankings && rankings.length > 0 && 
         graphData && graphData.edges && 
-        historicalData && historicalData.length > 0
+        historicalData && historicalData.length > 0 &&
+        healthData && healthData.length > 0
     );
 
     // Keep ref in sync with state
@@ -395,10 +396,58 @@ const AIAnalysisPanel = ({
                 return (name || '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
             };
 
-            const findHealthInfoById = (id) => {
-                const rankInfo = rankings.find(r => r.id === id);
-                const rankName = getCleanName(rankInfo);
-                return healthData.find(item => getCleanName(item) === rankName) || null;
+            const findRankingInfoByName = (name) => {
+                const cleanName = getCleanName(name);
+                return rankings.find(item => getCleanName(item) === cleanName) || null;
+            };
+
+            const findHealthInfoByName = (name) => {
+                const cleanName = getCleanName(name);
+                return healthData.find(item => getCleanName(item) === cleanName) || null;
+            };
+
+            const getScreeningSourceByName = (name, fallbackItem = null) => {
+                return findHealthInfoByName(name) || findRankingInfoByName(name) || fallbackItem;
+            };
+
+            const getScreeningEntries = (item) => {
+                if (!item) return [];
+                if (item.first_stage_thresholds && item.first_stage_thresholds.length > 0) {
+                    return item.first_stage_thresholds.map(value => ({
+                        raw: String(value).trim(),
+                        subject: String(value).replace(/\(.+?\)/g, '').trim()
+                    }));
+                }
+                if (item.first_stage_groups && item.first_stage_groups.length > 0) {
+                    return item.first_stage_groups.flatMap(group =>
+                        (group.first_stage_thresholds || []).map(value => ({
+                            raw: String(value).trim(),
+                            subject: String(value).replace(/\(.+?\)/g, '').trim(),
+                            groupName: group.group_name
+                        }))
+                    );
+                }
+                return [];
+            };
+
+            const formatScreeningOverlap = (targetItem, compItem) => {
+                const targetEntries = getScreeningEntries(targetItem);
+                const compEntries = getScreeningEntries(compItem);
+                if (targetEntries.length === 0 || compEntries.length === 0) return '資料不足';
+
+                const targetRawSet = new Set(targetEntries.map(entry => entry.raw));
+                const targetSubjectSet = new Set(targetEntries.map(entry => entry.subject));
+                const exactMatches = compEntries
+                    .filter(entry => targetRawSet.has(entry.raw))
+                    .map(entry => entry.raw);
+                const subjectMatches = compEntries
+                    .filter(entry => !targetRawSet.has(entry.raw) && targetSubjectSet.has(entry.subject))
+                    .map(entry => entry.raw);
+
+                const parts = [];
+                if (exactMatches.length > 0) parts.push(`完全相同項目：${[...new Set(exactMatches)].join('、')}`);
+                if (subjectMatches.length > 0) parts.push(`同科目但門檻不同：${[...new Set(subjectMatches)].join('、')}`);
+                return parts.length > 0 ? parts.join('；') : '未見明顯重合';
             };
 
             const formatHealthText = (item) => {
@@ -409,20 +458,24 @@ const AIAnalysisPanel = ({
             const buildFlowDiagnosticSummary = () => {
                 const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
                 const targetRankingInfo = rankings.find(r => r.id === selectedDept);
-                const targetHealthInfo = findHealthInfoById(selectedDept);
-                const targetScreening = getScreeningTextForItem(targetHealthInfo || targetRankingInfo);
+                const targetNameForLookup = getCleanName(targetRankingInfo) || targetName;
+                const targetHealthInfo = findHealthInfoByName(targetNameForLookup);
+                const targetScreeningSource = getScreeningSourceByName(targetNameForLookup, targetRankingInfo);
+                const targetScreening = getScreeningTextForItem(targetScreeningSource);
 
                 const formatEdge = (edge, direction) => {
                     const compId = edge.from === selectedDept ? edge.to : edge.from;
                     const compRankingInfo = rankings.find(r => r.id === compId);
-                    const compHealthInfo = findHealthInfoById(compId);
                     const compName = getCleanName(compRankingInfo) || compId;
-                    const compScreening = getScreeningTextForItem(compHealthInfo || compRankingInfo);
+                    const compHealthInfo = findHealthInfoByName(compName);
+                    const compScreeningSource = getScreeningSourceByName(compName, compRankingInfo);
+                    const compScreening = getScreeningTextForItem(compScreeningSource);
+                    const screeningOverlap = formatScreeningOverlap(targetScreeningSource, compScreeningSource);
                     const compRScore = compRankingInfo?.r_score ?? 'N/A';
                     const compAvgScore = compRankingInfo?.avg_score ?? 'N/A';
                     const compHealthText = formatHealthText(compHealthInfo);
                     const label = direction === 'outflow' ? '流失至' : direction === 'inflow' ? '從對手流入' : '雙方都沒選';
-                    return `- ${label}【${compName}】：${edge.value || 0} 人 | 對手 R-Score = ${compRScore} | 對手最低錄取平均分數 = ${compAvgScore} | ${compHealthText} | 本校${targetScreening} | 對手${compScreening}`;
+                    return `- ${label}【${compName}】：${edge.value || 0} 人 | 對手 R-Score = ${compRScore} | 對手最低錄取平均分數 = ${compAvgScore} | ${compHealthText} | 本校${targetScreening} | 對手${compScreening} | 與本校一階重合 = ${screeningOverlap}`;
                 };
 
                 const outflows = connectedEdges
@@ -478,8 +531,10 @@ ${analysisWritingRules}`;
                     return '';
                 };
 
-                const targetHealthInfo = healthData.find(item => item.name.includes(targetName.split(' ')[0]) || item.name.includes(targetName));
-                const targetScreening = targetHealthInfo ? getScreeningText(targetHealthInfo) : '無資料';
+                const targetRankingInfo = rankings.find(r => r.id === selectedDept);
+                const targetNameForLookup = getCleanName(targetRankingInfo) || targetName;
+                const targetScreeningSource = getScreeningSourceByName(targetNameForLookup, targetRankingInfo);
+                const targetScreening = getScreeningText(targetScreeningSource);
 
                 const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
                 const inflow = [];
@@ -495,15 +550,18 @@ ${analysisWritingRules}`;
                     const toName = rankings.find(r => r.id === toId)?.name.replace(/\n/g, ' ') || toId;
 
                     const compId = edge.from === selectedDept ? toId : fromId;
-                    const compHealthInfo = healthData.find(item => rankings.find(r => r.id === compId)?.name.replace(/\n/g, ' ') === item.name.replace(/\n/g, ' '));
-                    const compScreening = compHealthInfo ? getScreeningText(compHealthInfo) : '無資料';
+                    const compRankingInfo = rankings.find(r => r.id === compId);
+                    const compNameForLookup = getCleanName(compRankingInfo);
+                    const compScreeningSource = getScreeningSourceByName(compNameForLookup, compRankingInfo);
+                    const compScreening = getScreeningText(compScreeningSource);
+                    const screeningOverlap = formatScreeningOverlap(targetScreeningSource, compScreeningSource);
 
                     if (edge.drawn) {
-                        draws.push(`- 與【${edge.from === selectedDept ? toName : fromName}】雙方都沒選（同時錄取學生最後兩邊都沒選）：${edge.value || 0} 人 [對手${compScreening}]`);
+                        draws.push(`- 與【${edge.from === selectedDept ? toName : fromName}】雙方都沒選（同時錄取學生最後兩邊都沒選）：${edge.value || 0} 人 [對手${compScreening}；與本校一階重合 = ${screeningOverlap}]`);
                     } else if (edge.from === selectedDept) {
-                        outflow.push(`- 流失至【${toName}】（考生選擇對方）：${edge.value || 0} 人 [對手${compScreening}]`);
+                        outflow.push(`- 流失至【${toName}】（考生選擇對方）：${edge.value || 0} 人 [對手${compScreening}；與本校一階重合 = ${screeningOverlap}]`);
                     } else {
-                        inflow.push(`- 從【${fromName}】流入（考生選擇本校）：${edge.value || 0} 人 [對手${compScreening}]`);
+                        inflow.push(`- 從【${fromName}】流入（考生選擇本校）：${edge.value || 0} 人 [對手${compScreening}；與本校一階重合 = ${screeningOverlap}]`);
                     }
                 });
 
@@ -539,6 +597,7 @@ ${draws.length > 0 ? draws.join('\n') : '- 無顯著雙方都沒選數據'}
 
 請幫校方進行以下「單一年度競爭診斷與策略分析」並給予建議：
 1. 【最大競爭對手與門檻重合診斷】：識別本${dimensionText}當年度的主要競爭對手有哪些？誰是搶走我們最多學生的「最大流失對手」？並重點評估本校與該最大對手之間，一階篩選門檻（順序1~5）是否高度重合？分析若對方品牌/實力較強但我們篩選門檻卻與之重合，是否會使我們被學生當成「保底選項」（也就是學生若兩個都錄取，會優先選更想去的學校，導致我們流失同時錄取學生）。
+   - 最大流失對手必須以「流失學生人數最多」為準；如果門檻較相似的是其他流失人數較少的對手，請另列為「其他門檻重合對手」，不可取代最大流失對手的判斷。
 2. 【流入/流失強弱勢診斷】：分析學生在哪些對手之間最後選擇本校（流入），在哪些對手之間最後選擇對手（流失）？這背後代表了學生在選填時面臨怎樣的替代性與吸引力差距（如學校品牌、就業吸引力、地理位置等）？
 3. 【篩選門檻調控與防禦策略建議】：針對上述流失狀況與篩選門檻重合度，校方應如何調控一階篩選條件（順序1~5）以錯開與最大競爭對手的重合，防止篩到會優先去更強對手的考生，進而提升登記就讀率？請以條列方式提出具體操作建議。
 `;
@@ -899,8 +958,10 @@ ${disappearedCompText}
                     return '';
                 };
 
-                const targetHealthInfo = healthData.find(item => item.name.includes(targetName.split(' ')[0]) || item.name.includes(targetName));
-                const targetScreening = targetHealthInfo ? getScreeningText(targetHealthInfo) : '無資料';
+                const targetRankingInfo = rankings.find(r => r.id === selectedDept);
+                const targetNameForLookup = getCleanName(targetRankingInfo) || targetName;
+                const targetScreeningSource = getScreeningSourceByName(targetNameForLookup, targetRankingInfo);
+                const targetScreening = getScreeningText(targetScreeningSource);
 
                 const connectedEdges = graphData.edges.filter(edge => edge.from === selectedDept || edge.to === selectedDept);
                 const inflowDetails = [];
@@ -916,14 +977,17 @@ ${disappearedCompText}
                     const toName = rankings.find(r => r.id === toId)?.name.replace(/\n/g, ' ') || toId;
 
                     const compId = edge.from === selectedDept ? toId : fromId;
-                    const compHealthInfo = healthData.find(item => rankings.find(r => r.id === compId)?.name.replace(/\n/g, ' ') === item.name.replace(/\n/g, ' '));
-                    const compScreening = compHealthInfo ? getScreeningText(compHealthInfo) : '無資料';
+                    const compRankingInfo = rankings.find(r => r.id === compId);
+                    const compNameForLookup = getCleanName(compRankingInfo);
+                    const compScreeningSource = getScreeningSourceByName(compNameForLookup, compRankingInfo);
+                    const compScreening = getScreeningText(compScreeningSource);
+                    const screeningOverlap = formatScreeningOverlap(targetScreeningSource, compScreeningSource);
 
                     if (edge.from === selectedDept) {
-                        outflowDetails.push(`  - 流失至【${toName}】：${edge.value || 0} 人 [對手${compScreening}]`);
+                        outflowDetails.push(`  - 流失至【${toName}】：${edge.value || 0} 人 [對手${compScreening}；與本校一階重合 = ${screeningOverlap}]`);
                     }
                     if (edge.to === selectedDept) {
-                        inflowDetails.push(`  - 從【${fromName}】流入：${edge.value || 0} 人 [對手${compScreening}]`);
+                        inflowDetails.push(`  - 從【${fromName}】流入：${edge.value || 0} 人 [對手${compScreening}；與本校一階重合 = ${screeningOverlap}]`);
                     }
                 });
 
@@ -953,6 +1017,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
 1. 【最大競爭對手與一階門檻重合分析】：
    - 誰是搶走我們最多學生的「最大流失對手」？這反映了我們與該校系在品牌與就業吸引力上有何落差？
    - 探討我們為什麼都輸的原因。請特別評估本校與該最大對手之間【第一階段篩選標準（順序1~5）】是否具有高度重合性。分析在篩選標準高度重合時，若對方在學術名聲或品牌上比我們更好，為何學生一定會選擇更好的學校，而我們則淪為單純被放棄的「保底學校」。
+   - 最大流失對手必須以「流失學生人數最多」為準；如果門檻較相似的是其他流失人數較少的對手，請另列為「其他門檻重合對手」，不可取代最大流失對手的判斷。
 2. 【流入流出與吸引力落差】：同時錄取後，學生最後選擇本校的人比較多，還是選擇對手的人比較多？這對本${dimensionText}整體的品牌實力防禦有何啟示？
 3. 【科學化備取與一階門檻調整建議】：
    - 根據流失學生的具體人數與流動規模，校方應如何科學化地設定二階備取名單長度，以確保在甄審階段能完全補滿？
@@ -995,6 +1060,8 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
             const cleanedText = resultText
                 .replace(/\$([^$]+)\$/g, '$1') // 移除包含在 $ ... $ 內部的包裹符號
                 .replace(/\\%/g, '%')           // 將 \% 轉為 %
+                .replace(/\\rightarrow/g, '→')  // 將 \rightarrow 轉為 →
+                .replace(/\\to/g, '→')           // 將 \to 轉為 →
                 .replace(/\\times/g, '×')       // 將 \times 轉為 ×
                 .replace(/\\div/g, '÷')         // 將 \div 轉為 ÷
                 .replace(/\\cdot/g, '·');       // 將 \cdot 轉為 ·
