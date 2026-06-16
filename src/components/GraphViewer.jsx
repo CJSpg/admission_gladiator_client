@@ -14,6 +14,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
     const [activeTab, setActiveTab] = useState('network');
     const [trendType, setTrendType] = useState('rscore_avgscore');
     const [quadrantMode, setQuadrantMode] = useState('rscore_avg');
+    const [zhengEffectThreshold, setZhengEffectThreshold] = useState(80);
+    const [yieldRateThreshold, setYieldRateThreshold] = useState(80);
 
     // 當切換圖表分頁時，將子分頁狀態重設回預設值
     useEffect(() => {
@@ -38,7 +40,7 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                 { id: 'health', label: '🛡️ 招生效益' },
                 { id: 'quadrant', label: '📍 校系軌跡' },
                 { id: 'timeline', label: '⏳ 競爭時間軸' },
-                { id: 'flow', label: '🔄 流動情報' },
+                { id: 'flow', label: '🔄 學生選擇流向' },
             ].map(tab => (
                 <button
                     key={tab.id}
@@ -110,6 +112,10 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                                 myLabel={myLabel}
                                 graphData={graphData}
                                 trendDepts={trendDepts}
+                                zhengEffectThreshold={zhengEffectThreshold}
+                                setZhengEffectThreshold={setZhengEffectThreshold}
+                                yieldRateThreshold={yieldRateThreshold}
+                                setYieldRateThreshold={setYieldRateThreshold}
                             />
                         )}
 
@@ -125,7 +131,7 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                             />
                         )}
 
-                        {/* 子元件 5：流動情報圖 */}
+                        {/* 子元件 5：學生選擇流向圖 */}
                         {activeTab === 'flow' && (
                             <FlowTable
                                 graphData={graphData}
@@ -150,6 +156,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                             currentDeptInfo={currentDeptInfo}
                             healthData={healthData}
                             timelineRankData={timelineRankData}
+                            zhengEffectThreshold={zhengEffectThreshold}
+                            yieldRateThreshold={yieldRateThreshold}
                         />
                     </div>
                 </>

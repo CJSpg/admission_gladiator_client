@@ -151,15 +151,25 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                         const normalizedCurrentName = normalizeName(currentFullName);
                         const deptData = processedRankings.find(d => normalizeName(d.name) === normalizedCurrentName);
                         if (deptData) {
+                            const yieldRate = parseScore(deptData.yield_rate);
+                            const zhengEffect = parseScore(deptData.zheng_effect);
                             yearData[`${id}_RScore`] = parseScore(deptData.r_score);
                             yearData[`${id}_AvgScore`] = parseScore(deptData.avg_score);
                             yearData[`${id}_AvgScorePR`] = parseScore(deptData.avg_score_pr);
                             yearData[`${id}_FlowRate`] = deptData.flow_rate !== undefined ? Number((parseScore(deptData.flow_rate) * 100).toFixed(1)) : null;
+                            yearData[`${id}_YieldRate`] = yieldRate !== null ? Number((yieldRate * 100).toFixed(1)) : null;
+                            yearData[`${id}_ZhengEffect`] = zhengEffect !== null ? Number((zhengEffect * 100).toFixed(1)) : null;
+                            yearData[`${id}_FirstStageThresholds`] = deptData.first_stage_thresholds || null;
+                            yearData[`${id}_FirstStageGroups`] = deptData.first_stage_groups || null;
                         } else {
                             yearData[`${id}_RScore`] = null;
                             yearData[`${id}_AvgScore`] = null;
                             yearData[`${id}_AvgScorePR`] = null;
                             yearData[`${id}_FlowRate`] = null;
+                            yearData[`${id}_YieldRate`] = null;
+                            yearData[`${id}_ZhengEffect`] = null;
+                            yearData[`${id}_FirstStageThresholds`] = null;
+                            yearData[`${id}_FirstStageGroups`] = null;
                         }
                     });
                     return yearData;
@@ -386,6 +396,8 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                 yield_rate: info.yield_rate ? Number((info.yield_rate * 100).toFixed(1)) : 0,
                 zheng_effect: info.zheng_effect ? Number((info.zheng_effect * 100).toFixed(1)) : 0,
                 flow_rate: info.flow_rate ? Number((info.flow_rate * 100).toFixed(1)) : 0,
+                first_stage_thresholds: info.first_stage_thresholds || null,
+                first_stage_groups: info.first_stage_groups || null,
             };
         });
     }, [trendDepts, currentDeptInfo, rankings]);

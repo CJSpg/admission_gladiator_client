@@ -11,6 +11,8 @@ import {
     ReferenceArea
 } from 'recharts';
 
+const DEFAULT_EFFECT_YIELD_THRESHOLD = 80;
+
 // --- Helper Functions ---
 
 /**
@@ -170,42 +172,47 @@ export const getQuadrantRScoreAvg = (rScorePr, avgScorePr) => {
 
 /**
  * Classifies coordinates into quadrants and provides localized descriptions for Mode 2.
- * X axis: zheng_effect_percent (50)
- * Y axis: yield_rate_percent (50)
+ * X axis: zheng_effect_percent
+ * Y axis: yield_rate_percent
  */
-export const getQuadrantEffectYield = (zhengEffect, yieldRate) => {
+export const getQuadrantEffectYield = (
+    zhengEffect,
+    yieldRate,
+    zhengThreshold = DEFAULT_EFFECT_YIELD_THRESHOLD,
+    yieldThreshold = DEFAULT_EFFECT_YIELD_THRESHOLD
+) => {
     if (zhengEffect === null || yieldRate === null || zhengEffect === undefined || yieldRate === undefined) {
         return { name: '資料不足', desc: '無法判斷招生象限' };
     }
-    const zhengThreshold = 50;
-    const yieldThreshold = 50;
+    const zhengThresholdText = `${zhengThreshold}%`;
+    const yieldThresholdText = `${yieldThreshold}%`;
 
     if (zhengEffect >= zhengThreshold && yieldRate >= yieldThreshold) {
         return {
             name: '高效穩定型',
-            desc: '目前本校系組位於「高效穩定型」象限，代表其正取有效性與報到率皆高於設定標準。這顯示正取學生有極高意願就讀，且最終報到狀況非常穩定，招生精準度與吸引力皆表現優異。'
+            desc: `目前本校系組位於「高效穩定型」象限，代表其正取有效性達 ${zhengThresholdText} 基準，報到率也達 ${yieldThresholdText} 基準。這顯示正取學生有較高意願就讀，且最終報到狀況相對穩定。`
         };
     } else if (zhengEffect < zhengThreshold && yieldRate >= yieldThreshold) {
         return {
             name: '備取依賴型',
-            desc: '目前本校系組位於「備取依賴型」象限，代表報到率達到穩定標準，但正取有效性較低。這顯示大部分正取學生流失，但透過備取遞補成功填滿名額。建議檢視招生定位，或調整正備取倍率與篩選標準。'
+            desc: `目前本校系組位於「備取依賴型」象限，代表報到率達 ${yieldThresholdText} 基準，但正取有效性未達 ${zhengThresholdText}。這顯示正取學生流失較多，但透過備取遞補把報到率拉回穩定水準。`
         };
     } else if (zhengEffect >= zhengThreshold && yieldRate < yieldThreshold) {
         return {
             name: '精準但不足型',
-            desc: '目前本校系組位於「精準但不足型」象限，代表正取有效性高，但最終報到率未達穩定標準。這顯示雖然錄取的學生報到意願高，但可能因為招生名額過多、備取人數不足或有缺額情形，導致整體報到率偏低。'
+            desc: `目前本校系組位於「精準但不足型」象限，代表正取有效性達 ${zhengThresholdText} 基準，但報到率未達 ${yieldThresholdText}。這顯示正取學生就讀意願相對穩定，但整體報到仍不足，需檢視招生名額、備取人數或遞補狀況。`
         };
     } else {
         return {
             name: '招生弱勢型',
-            desc: '目前本校系組位於「招生弱勢型」象限，代表正取有效性與報到率皆未達標準。這顯示正取學生就讀意願低，且最終報到轉換狀況欠佳，屬於招生風險較高之校系，建議優先檢討招生策略與競爭對手關係。'
+            desc: `目前本校系組位於「招生弱勢型」象限，代表正取有效性未達 ${zhengThresholdText} 基準，報到率也未達 ${yieldThresholdText} 基準。這顯示正取學生就讀意願與最終報到轉換狀況都偏弱，建議優先檢討招生策略與競爭對手關係。`
         };
     }
 };
 
 // --- Custom Tooltip Component ---
 
-const CustomTooltip = ({ active, payload, selectedDept, mode }) => {
+const CustomTooltip = ({ active, payload, selectedDept, mode, zhengEffectThreshold, yieldRateThreshold }) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         if (!data) return null;
@@ -254,7 +261,7 @@ const CustomTooltip = ({ active, payload, selectedDept, mode }) => {
             // Mode: effect_yield
             const zhengEffectPercent = data.zheng_effect_percent !== undefined ? data.zheng_effect_percent : data.x;
             const yieldRatePercent = data.yield_rate_percent !== undefined ? data.yield_rate_percent : data.y;
-            const quadrant = getQuadrantEffectYield(zhengEffectPercent, yieldRatePercent);
+            const quadrant = getQuadrantEffectYield(zhengEffectPercent, yieldRatePercent, zhengEffectThreshold, yieldRateThreshold);
 
             return (
                 <div style={{
@@ -308,7 +315,11 @@ const PlacementQuadrantChart = ({
     currentYear,
     myLabel,
     graphData,
-    trendDepts
+    trendDepts,
+    zhengEffectThreshold = DEFAULT_EFFECT_YIELD_THRESHOLD,
+    setZhengEffectThreshold,
+    yieldRateThreshold = DEFAULT_EFFECT_YIELD_THRESHOLD,
+    setYieldRateThreshold
 }) => {
     // Mode switcher: 'rscore_avg' (R-score PR vs Avg Score PR) or 'effect_yield' (Zheng effect vs Yield rate)
     const [localMode, setLocalMode] = useState('rscore_avg');
@@ -317,6 +328,26 @@ const PlacementQuadrantChart = ({
     const [allYearsRankings, setAllYearsRankings] = useState({});
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [comparedDepts, setComparedDepts] = useState([]);
+    const zhengThresholdNumber = Number(zhengEffectThreshold);
+    const yieldThresholdNumber = Number(yieldRateThreshold);
+    const normalizedZhengEffectThreshold = Number.isFinite(zhengThresholdNumber)
+        ? Math.min(100, Math.max(0, zhengThresholdNumber))
+        : DEFAULT_EFFECT_YIELD_THRESHOLD;
+    const normalizedYieldRateThreshold = Number.isFinite(yieldThresholdNumber)
+        ? Math.min(100, Math.max(0, yieldThresholdNumber))
+        : DEFAULT_EFFECT_YIELD_THRESHOLD;
+
+    const updateZhengEffectThreshold = (value) => {
+        if (!setZhengEffectThreshold) return;
+        const nextValue = Math.min(100, Math.max(0, Number(value) || 0));
+        setZhengEffectThreshold(nextValue);
+    };
+
+    const updateYieldRateThreshold = (value) => {
+        if (!setYieldRateThreshold) return;
+        const nextValue = Math.min(100, Math.max(0, Number(value) || 0));
+        setYieldRateThreshold(nextValue);
+    };
 
     // Clear compared competitors on department or dimension change
     useEffect(() => {
@@ -541,7 +572,7 @@ const PlacementQuadrantChart = ({
     const quadrantInfo = currentDeptPoint
         ? (mode === 'rscore_avg'
             ? getQuadrantRScoreAvg(currentDeptPoint.x, currentDeptPoint.y)
-            : getQuadrantEffectYield(currentDeptPoint.x, currentDeptPoint.y))
+            : getQuadrantEffectYield(currentDeptPoint.x, currentDeptPoint.y, normalizedZhengEffectThreshold, normalizedYieldRateThreshold))
         : null;
 
     // Generate YoY movement analysis
@@ -710,6 +741,87 @@ const PlacementQuadrantChart = ({
                 </button>
             </div>
 
+            {mode === 'effect_yield' && (
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '12px',
+                    margin: '-4px 0 18px 0',
+                    flexWrap: 'wrap',
+                    fontSize: '13px',
+                    color: '#475569'
+                }}>
+                    {[
+                        {
+                            id: 'zheng-effect-threshold',
+                            label: '正取有效性門檻',
+                            value: normalizedZhengEffectThreshold,
+                            update: updateZhengEffectThreshold,
+                            color: '#2ecc71'
+                        },
+                        {
+                            id: 'yield-rate-threshold',
+                            label: '報到率門檻',
+                            value: normalizedYieldRateThreshold,
+                            update: updateYieldRateThreshold,
+                            color: '#3498db'
+                        }
+                    ].map(control => (
+                        <div key={control.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <label htmlFor={control.id} style={{ fontWeight: 'bold', color: '#334155' }}>
+                                {control.label}
+                            </label>
+                            <input
+                                id={control.id}
+                                type="range"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={control.value}
+                                onChange={(event) => control.update(event.target.value)}
+                                style={{ width: '150px', accentColor: control.color }}
+                            />
+                            <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={control.value}
+                                onChange={(event) => control.update(event.target.value)}
+                                style={{
+                                    width: '68px',
+                                    padding: '5px 8px',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '6px',
+                                    color: '#334155',
+                                    fontWeight: 'bold'
+                                }}
+                            />
+                            <span>%</span>
+                        </div>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            updateZhengEffectThreshold(DEFAULT_EFFECT_YIELD_THRESHOLD);
+                            updateYieldRateThreshold(DEFAULT_EFFECT_YIELD_THRESHOLD);
+                        }}
+                        style={{
+                            padding: '5px 10px',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            backgroundColor: '#fff',
+                            color: '#64748b',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        重設
+                    </button>
+                </div>
+            )}
+
             {/* Scatter Plot area */}
             <div style={{ width: '100%', height: '400px', minHeight: '400px', flexShrink: 0, position: 'relative', backgroundColor: '#fff', borderRadius: '12px', padding: '10px 10px 20px 10px', marginBottom: '20px' }}>
                 {loadingHistory && (
@@ -776,9 +888,9 @@ const PlacementQuadrantChart = ({
                             <>
                                 {/* Top-Right */}
                                 <ReferenceArea
-                                    x1={50}
+                                    x1={normalizedZhengEffectThreshold}
                                     x2={100}
-                                    y1={50}
+                                    y1={normalizedYieldRateThreshold}
                                     y2={100}
                                     fill="rgba(46, 204, 113, 0.02)"
                                     label={{
@@ -792,8 +904,8 @@ const PlacementQuadrantChart = ({
                                 {/* Top-Left */}
                                 <ReferenceArea
                                     x1={0}
-                                    x2={50}
-                                    y1={50}
+                                    x2={normalizedZhengEffectThreshold}
+                                    y1={normalizedYieldRateThreshold}
                                     y2={100}
                                     fill="rgba(241, 196, 15, 0.02)"
                                     label={{
@@ -806,10 +918,10 @@ const PlacementQuadrantChart = ({
                                 />
                                 {/* Bottom-Right */}
                                 <ReferenceArea
-                                    x1={50}
+                                    x1={normalizedZhengEffectThreshold}
                                     x2={100}
                                     y1={0}
-                                    y2={50}
+                                    y2={normalizedYieldRateThreshold}
                                     fill="rgba(52, 152, 219, 0.02)"
                                     label={{
                                         value: "精準但不足型",
@@ -822,9 +934,9 @@ const PlacementQuadrantChart = ({
                                 {/* Bottom-Left */}
                                 <ReferenceArea
                                     x1={0}
-                                    x2={50}
+                                    x2={normalizedZhengEffectThreshold}
                                     y1={0}
-                                    y2={50}
+                                    y2={normalizedYieldRateThreshold}
                                     fill="rgba(231, 76, 60, 0.02)"
                                     label={{
                                         value: "招生弱勢型",
@@ -836,13 +948,23 @@ const PlacementQuadrantChart = ({
                                 />
 
                                 {/* Reference lines (Dividers) */}
-                                <ReferenceLine x={50} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
-                                <ReferenceLine y={50} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
+                                <ReferenceLine x={normalizedZhengEffectThreshold} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
+                                <ReferenceLine y={normalizedYieldRateThreshold} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
                             </>
                         )}
 
                         {/* Tooltip */}
-                        <Tooltip content={<CustomTooltip selectedDept={selectedDept} mode={mode} />} cursor={{ strokeDasharray: '3 3', stroke: '#94a3b8' }} />
+                        <Tooltip
+                            content={(
+                                <CustomTooltip
+                                    selectedDept={selectedDept}
+                                    mode={mode}
+                                    zhengEffectThreshold={normalizedZhengEffectThreshold}
+                                    yieldRateThreshold={normalizedYieldRateThreshold}
+                                />
+                            )}
+                            cursor={{ strokeDasharray: '3 3', stroke: '#94a3b8' }}
+                        />
 
                         {/* Scatter points for other related departments */}
                         <Scatter

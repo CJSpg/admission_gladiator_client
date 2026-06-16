@@ -25,7 +25,7 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
             // 新增：根據勾選的狀態進行過濾
             .filter(edge => {
                 if (edge.drawn) {
-                    return showDraw; // 平手
+                    return showDraw; // 雙方都沒選
                 } else if (edge.from === selectedDept) {
                     return showOutflow; // 流出
                 } else if (edge.to === selectedDept) {
@@ -51,7 +51,7 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
                 };
 
                 if (newEdge.drawn) {
-                    // 🔘 平手交集：兩個都沒去 (灰色虛線，無箭頭)
+                    // 🔘 雙方都沒選：同時錄取學生最後兩邊都沒選 (灰色虛線，無箭頭)
                     newEdge.color = { color: '#bdc3c7', highlight: '#95a5a6' };
                     newEdge.dashes = [5, 5];
                     newEdge.arrows = '';
@@ -183,7 +183,7 @@ const NetworkChart = ({ graphData, selectedDept, rankings, activeTab }) => {
                         checked={showDraw}
                         onChange={(e) => setShowDraw(e.target.checked)}
                     />
-                    🔘 顯示平手交集
+                    🔘 顯示雙方都沒選
                 </label>
             </div>
 

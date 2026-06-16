@@ -57,9 +57,9 @@ const FlowTable = ({ graphData, selectedDept, rankings }) => {
 
     return (
         <div className="chart-wrapper" style={{ padding: '10px' }}>
-            <h3 style={{ marginBottom: '5px' }}>🔄 學生流動情報分析</h3>
+            <h3 style={{ marginBottom: '5px' }}>🔄 學生選擇流向分析</h3>
             <p style={{ textAlign: 'center', fontSize: '13px', color: '#7f8c8d', marginBottom: '20px', marginTop: 0 }}>
-                💡 追蹤真實的學生移動軌跡，精準界定主要競爭對手。
+                💡 查看同時錄取本系與對手的學生，最後選擇哪一邊。
             </p>
 
             {/* 左右雙欄排版 */}
