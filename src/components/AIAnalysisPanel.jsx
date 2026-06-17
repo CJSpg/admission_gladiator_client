@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const ANALYSIS_PROMPT_VERSION = 'screening-overlap-2026-06-17-v4';
+const ANALYSIS_PROMPT_VERSION = 'data-null-guards-2026-06-17-v7';
 
 // --- Helper Functions (replicating calculations for prompt construction) ---
 const parseNumber = (val) => {
@@ -253,6 +253,7 @@ const AIAnalysisPanel = ({
     selectedDimension,
     rankings,
     graphData,
+    years = [],
     currentYear,
     historicalData,
     currentDeptInfo,
@@ -265,12 +266,50 @@ const AIAnalysisPanel = ({
     const analysisCacheRef = useRef({});
     const firedPrefixRef = useRef('');
 
+    const connectedHistoricalIds = new Set([selectedDept]);
+    if (graphData && graphData.edges) {
+        graphData.edges
+            .filter(edge => edge.from === selectedDept || edge.to === selectedDept)
+            .forEach(edge => {
+                connectedHistoricalIds.add(edge.from);
+                connectedHistoricalIds.add(edge.to);
+            });
+    }
+    const currentHistoricalDataKey = [
+        selectedDimension,
+        selectedDept,
+        years.join(','),
+        Array.from(connectedHistoricalIds).sort().join(',')
+    ].join('|');
+
+    const hasCurrentHistoricalData = !!(
+        historicalData &&
+        historicalData.length > 0 &&
+        historicalData.every(row => row._sourceKey === currentHistoricalDataKey) &&
+        Array.from(connectedHistoricalIds).every(id =>
+            historicalData.every(row =>
+                Object.prototype.hasOwnProperty.call(row, `${id}_RScore`)
+            )
+        )
+    );
+    const hasCurrentTimelineData = !!(
+        timelineRankData &&
+        timelineRankData.length > 0 &&
+        timelineRankData.every(row => row._sourceKey === currentHistoricalDataKey)
+    );
+    const hasCurrentHealthData = !!(
+        healthData &&
+        healthData.length > 0 &&
+        healthData.every(row => row._sourceKey === currentHistoricalDataKey)
+    );
+
     // Define isDataReady variable to check if necessary data exists before query execution
     const isDataReady = !!(
         rankings && rankings.length > 0 && 
         graphData && graphData.edges && 
-        historicalData && historicalData.length > 0 &&
-        healthData && healthData.length > 0
+        hasCurrentHistoricalData &&
+        hasCurrentTimelineData &&
+        hasCurrentHealthData
     );
 
     // Keep ref in sync with state
@@ -283,11 +322,14 @@ const AIAnalysisPanel = ({
             const targetName = currentDeptInfo?.name ? currentDeptInfo.name.replace(/\n/g, ' ') : selectedDept;
             const dimensionText = selectedDimension === 'school' ? '學校' : selectedDimension === 'group' ? '系組' : '科系';
 
-            const sortedRankings = [...rankings].sort((a,b) => (b.r_score || 0) - (a.r_score || 0));
+            const sortedRankings = rankings
+                .filter(r => parseNumber(r.r_score) !== null)
+                .sort((a, b) => parseNumber(b.r_score) - parseNumber(a.r_score));
             const targetRankIndex = sortedRankings.findIndex(r => r.id === selectedDept);
             const targetRank = targetRankIndex !== -1 ? targetRankIndex + 1 : 'N/A';
             const totalRanked = sortedRankings.length;
-            const targetRS = rankings.find(r => r.id === selectedDept)?.r_score || 'N/A';
+            const targetRScoreValue = rankings.find(r => r.id === selectedDept)?.r_score;
+            const targetRS = parseNumber(targetRScoreValue) === null ? 'N/A' : String(targetRScoreValue);
             const zhengEffectThresholdText = `${zhengEffectThreshold}%`;
             const yieldRateThresholdText = `${yieldRateThreshold}%`;
 
@@ -295,6 +337,15 @@ const AIAnalysisPanel = ({
                 const num = parseNumber(value);
                 if (num === null) return 'N/A';
                 return `${Number(num.toFixed(digits))}${suffix}`;
+            };
+            const formatPromptValue = (value) => {
+                const num = parseNumber(value);
+                if (num === null) return 'N/A';
+                return String(value);
+            };
+            const formatPromptPercent = (value) => {
+                const text = formatPromptValue(value);
+                return text === 'N/A' ? text : `${text}%`;
             };
 
             const sortedHistoricalRows = [...historicalData].sort((a, b) =>
@@ -467,7 +518,7 @@ const AIAnalysisPanel = ({
 
             const formatHealthText = (item) => {
                 if (!item) return '招生效益資料 = 無資料';
-                return `報到率 = ${item.yield_rate}% | 正取有效性 = ${item.zheng_effect}% | 流入登分比例 = ${item.flow_rate}%`;
+                return `報到率 = ${formatPromptPercent(item.yield_rate)} | 正取有效性 = ${formatPromptPercent(item.zheng_effect)} | 流入登分比例 = ${formatPromptPercent(item.flow_rate)}`;
             };
 
             const buildFlowDiagnosticSummary = () => {
@@ -487,8 +538,8 @@ const AIAnalysisPanel = ({
                     const compOverlapSource = compRankingInfo || compScreeningSource;
                     const compScreening = getScreeningTextForItem(compScreeningSource);
                     const screeningOverlap = formatScreeningOverlap(targetOverlapSource, compOverlapSource);
-                    const compRScore = compRankingInfo?.r_score ?? 'N/A';
-                    const compAvgScore = compRankingInfo?.avg_score ?? 'N/A';
+                    const compRScore = formatPromptValue(compRankingInfo?.r_score);
+                    const compAvgScore = formatPromptValue(compRankingInfo?.avg_score);
                     const compHealthText = formatHealthText(compHealthInfo);
                     const label = direction === 'outflow' ? '流失至' : direction === 'inflow' ? '從對手流入' : '雙方都沒選';
                     return `- ${label}【${compName}】：${edge.value || 0} 人 | 對手 R-Score = ${compRScore} | 對手最低錄取平均分數 = ${compAvgScore} | ${compHealthText} | 本校${targetScreening} | 對手${compScreening} | 與本校一階重合 = ${screeningOverlap}`;
@@ -636,10 +687,10 @@ ${draws.length > 0 ? draws.join('\n') : '- 無顯著雙方都沒選數據'}
                     .map(c => c.id);
 
                 historicalData.forEach(yrData => {
-                    trendRows.push(`- **${yrData.name}** (本校): R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 最低錄取平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}, 最低錄取平均分數PR = ${yrData[`${selectedDept}_AvgScorePR`] || 'N/A'}, 報到率 = ${yrData[`${selectedDept}_YieldRate`] != null ? yrData[`${selectedDept}_YieldRate`] + '%' : 'N/A'}, 正取有效性 = ${yrData[`${selectedDept}_ZhengEffect`] != null ? yrData[`${selectedDept}_ZhengEffect`] + '%' : 'N/A'}, 流入登分比例 = ${yrData[`${selectedDept}_FlowRate`] != null ? yrData[`${selectedDept}_FlowRate`] + '%' : 'N/A'}, 一階篩選門檻 = ${formatScreeningFromParts(yrData[`${selectedDept}_FirstStageThresholds`], yrData[`${selectedDept}_FirstStageGroups`])}`);
+                    trendRows.push(`- **${yrData.name}** (本校): R-Score = ${formatPromptValue(yrData[`${selectedDept}_RScore`])}, 最低錄取平均分數 = ${formatPromptValue(yrData[`${selectedDept}_AvgScore`])}, 最低錄取平均分數PR = ${formatPromptValue(yrData[`${selectedDept}_AvgScorePR`])}, 報到率 = ${formatPromptPercent(yrData[`${selectedDept}_YieldRate`])}, 正取有效性 = ${formatPromptPercent(yrData[`${selectedDept}_ZhengEffect`])}, 流入登分比例 = ${formatPromptPercent(yrData[`${selectedDept}_FlowRate`])}, 一階篩選門檻 = ${formatScreeningFromParts(yrData[`${selectedDept}_FirstStageThresholds`], yrData[`${selectedDept}_FirstStageGroups`])}`);
                     topCompetitors.forEach(compId => {
                         const compName = rankings.find(r => r.id === compId)?.name.replace(/\n/g, ' ') || compId;
-                        trendRows.push(`  - 對手【${compName}】: R-Score = ${yrData[`${compId}_RScore`] || 'N/A'}, 最低錄取平均分數 = ${yrData[`${compId}_AvgScore`] || 'N/A'}, 最低錄取平均分數PR = ${yrData[`${compId}_AvgScorePR`] || 'N/A'}, 報到率 = ${yrData[`${compId}_YieldRate`] != null ? yrData[`${compId}_YieldRate`] + '%' : 'N/A'}, 正取有效性 = ${yrData[`${compId}_ZhengEffect`] != null ? yrData[`${compId}_ZhengEffect`] + '%' : 'N/A'}, 流入登分比例 = ${yrData[`${compId}_FlowRate`] != null ? yrData[`${compId}_FlowRate`] + '%' : 'N/A'}, 一階篩選門檻 = ${formatScreeningFromParts(yrData[`${compId}_FirstStageThresholds`], yrData[`${compId}_FirstStageGroups`])}`);
+                        trendRows.push(`  - 對手【${compName}】: R-Score = ${formatPromptValue(yrData[`${compId}_RScore`])}, 最低錄取平均分數 = ${formatPromptValue(yrData[`${compId}_AvgScore`])}, 最低錄取平均分數PR = ${formatPromptValue(yrData[`${compId}_AvgScorePR`])}, 報到率 = ${formatPromptPercent(yrData[`${compId}_YieldRate`])}, 正取有效性 = ${formatPromptPercent(yrData[`${compId}_ZhengEffect`])}, 流入登分比例 = ${formatPromptPercent(yrData[`${compId}_FlowRate`])}, 一階篩選門檻 = ${formatScreeningFromParts(yrData[`${compId}_FirstStageThresholds`], yrData[`${compId}_FirstStageGroups`])}`);
                     });
                 });
 
@@ -734,7 +785,7 @@ ${comparisonBaseInstruction}
                 healthData.forEach(item => {
                     const isSelf = item.name.includes(targetName.split(' ')[0]) || item.name.includes(targetName);
                     const screeningText = getScreeningText(item);
-                    healthItems.push(`- **${item.name}** ${isSelf ? '(本校)' : '(對手)'}: 甄審報到率 = ${item.yield_rate}% | 正取有效性 = ${item.zheng_effect}% | 流失/空缺比例 (即流入登分比例) = ${item.flow_rate}% | ${screeningText}`);
+                    healthItems.push(`- **${item.name}** ${isSelf ? '(本校)' : '(對手)'}: 甄審報到率 = ${formatPromptPercent(item.yield_rate)} | 正取有效性 = ${formatPromptPercent(item.zheng_effect)} | 流失/空缺比例 (即流入登分比例) = ${formatPromptPercent(item.flow_rate)} | ${screeningText}`);
                 });
 
                 prompt = `
@@ -764,19 +815,21 @@ ${comparisonBaseInstruction}
             } else if (tabId === 'quadrant') {
                 // Helper function for calculations
                 const calculatePercentileRank = (data, field, targetField) => {
-                    const values = data.map(d => d[field]).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
+                    const values = data.map(d => parseNumber(d[field])).filter(v => v !== null).sort((a, b) => a - b);
                     return data.map(d => ({
                         ...d,
-                        [targetField]: d[field] === null || d[field] === undefined ? null : 
-                            Math.round((values.indexOf(d[field]) / (values.length - 1)) * 100)
+                        [targetField]: parseNumber(d[field]) === null ? null :
+                            values.length <= 1 ? 100 :
+                                Math.round((values.indexOf(parseNumber(d[field])) / (values.length - 1)) * 100)
                     }));
                 };
                 const calculateAverageScorePercentileRank = (data, field, targetField) => {
-                    const values = data.map(d => d[field]).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
+                    const values = data.map(d => parseNumber(d[field])).filter(v => v !== null).sort((a, b) => a - b);
                     return data.map(d => ({
                         ...d,
-                        [targetField]: d[field] === null || d[field] === undefined ? null : 
-                            Math.round((values.indexOf(d[field]) / (values.length - 1)) * 100)
+                        [targetField]: parseNumber(d[field]) === null ? null :
+                            values.length <= 1 ? 100 :
+                                Math.round((values.indexOf(parseNumber(d[field])) / (values.length - 1)) * 100)
                     }));
                 };
 
@@ -784,14 +837,16 @@ ${comparisonBaseInstruction}
                 const bothPrData = calculateAverageScorePercentileRank(rScorePrData, 'avg_score', 'avg_score_pr');
                 const selfPr = bothPrData.find(item => item.id === selectedDept);
 
-                const currentRPr = selfPr?.r_score_pr !== null ? selfPr.r_score_pr : 'N/A';
-                const currentAPr = selfPr?.avg_score_pr !== null ? selfPr.avg_score_pr : 'N/A';
-                const currentZheng = currentDeptInfo?.zheng_effect !== undefined ? (currentDeptInfo.zheng_effect * 100).toFixed(1) : 'N/A';
-                const currentYield = currentDeptInfo?.yield_rate !== undefined ? (currentDeptInfo.yield_rate * 100).toFixed(1) : 'N/A';
+                const currentRPr = selfPr?.r_score_pr != null ? selfPr.r_score_pr : 'N/A';
+                const currentAPr = selfPr?.avg_score_pr != null ? selfPr.avg_score_pr : 'N/A';
+                const currentZhengValue = parseNumber(currentDeptInfo?.zheng_effect);
+                const currentYieldValue = parseNumber(currentDeptInfo?.yield_rate);
+                const currentZheng = currentZhengValue !== null ? (currentZhengValue * 100).toFixed(1) : 'N/A';
+                const currentYield = currentYieldValue !== null ? (currentYieldValue * 100).toFixed(1) : 'N/A';
 
                 const pathPoints = [];
                 historicalData.forEach(yrData => {
-                    pathPoints.push(`- **${yrData.name}**: R-Score = ${yrData[`${selectedDept}_RScore`] || 'N/A'}, 平均分數 = ${yrData[`${selectedDept}_AvgScore`] || 'N/A'}`);
+                    pathPoints.push(`- **${yrData.name}**: R-Score = ${formatPromptValue(yrData[`${selectedDept}_RScore`])}, 平均分數 = ${formatPromptValue(yrData[`${selectedDept}_AvgScore`])}`);
                 });
 
                 if (qMode === 'effect_yield') {
@@ -863,10 +918,10 @@ ${targetMetricSummary || '- 無歷年連續數據'}
                     const totalCount = data.totalCount || 0;
                     const currId = data.selectedDeptId || selectedDept;
                     const currRank = ranks[currId];
-                    const pr = currRank ? Math.round((1 - (currRank - 1) / totalCount) * 100) : 'N/A';
+                    const pr = currRank != null && totalCount > 0 ? Math.round((1 - (currRank - 1) / totalCount) * 100) : 'N/A';
                     
                     timelinePoints.push(`- **${data.year}**:`);
-                    timelinePoints.push(`  - 本校排名: ${currRank || 'N/A'} / 總競爭數 ${totalCount} (PR ${pr})`);
+                    timelinePoints.push(`  - 本校排名: ${currRank ?? 'N/A'} / 總競爭數 ${totalCount} (PR ${pr})`);
                 });
 
                 let fixedCompText = "- 無固定競爭對手數據";

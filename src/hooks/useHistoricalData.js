@@ -93,6 +93,10 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
     useEffect(() => {
         if (!selectedDept || !selectedDimension || years.length === 0 || !graphData.nodes.length) return;
 
+        setHistoricalData([]);
+        setTrendDepts([]);
+        setTimelineRankDataState([]);
+
         const { edges: allEdges, nodes: allNodes } = graphData;
 
         // 這是「當前選擇年度」的連線，保留給折線圖使用
@@ -102,6 +106,12 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
             targetIds.add(e.from);
             targetIds.add(e.to);
         });
+        const historicalDataKey = [
+            selectedDimension,
+            selectedDept,
+            years.join(','),
+            Array.from(targetIds).sort().join(',')
+        ].join('|');
 
         const targetNamesMap = {};
         targetIds.forEach(id => {
@@ -113,6 +123,8 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
         allNodes.forEach(n => {
             if (targetIds.has(n.id)) idToName[n.id] = n.label.replace(/\n/g, ' ');
         });
+
+        let isCancelled = false;
 
         const fetchHistoricalTrend = async () => {
             try {
@@ -137,7 +149,7 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                 const normalizeName = (name) => (name || "").replace(/\n/g, '').replace(/\s+/g, '').trim();
 
                 const trendData = results.map(({ year, rankingData }) => {
-                    const yearData = { name: `${year}學年` };
+                    const yearData = { name: `${year}學年`, _sourceKey: historicalDataKey };
 
                     // Calculate percentile ranks for this year's rankings
                     let processedRankings = [];
@@ -153,10 +165,11 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                         if (deptData) {
                             const yieldRate = parseScore(deptData.yield_rate);
                             const zhengEffect = parseScore(deptData.zheng_effect);
+                            const flowRate = parseScore(deptData.flow_rate);
                             yearData[`${id}_RScore`] = parseScore(deptData.r_score);
                             yearData[`${id}_AvgScore`] = parseScore(deptData.avg_score);
                             yearData[`${id}_AvgScorePR`] = parseScore(deptData.avg_score_pr);
-                            yearData[`${id}_FlowRate`] = deptData.flow_rate !== undefined ? Number((parseScore(deptData.flow_rate) * 100).toFixed(1)) : null;
+                            yearData[`${id}_FlowRate`] = flowRate !== null ? Number((flowRate * 100).toFixed(1)) : null;
                             yearData[`${id}_YieldRate`] = yieldRate !== null ? Number((yieldRate * 100).toFixed(1)) : null;
                             yearData[`${id}_ZhengEffect`] = zhengEffect !== null ? Number((zhengEffect * 100).toFixed(1)) : null;
                             yearData[`${id}_FirstStageThresholds`] = deptData.first_stage_thresholds || null;
@@ -175,10 +188,12 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                     return yearData;
                 });
 
+                if (isCancelled) return;
+
                 trendData.sort((a, b) => parseInt(a.name.replace(/\D/g, '')) - parseInt(b.name.replace(/\D/g, '')));
                 setHistoricalData(trendData);
 
-                const deptsArr = Array.from(targetIds).map(id => ({ id, name: idToName[id] }));
+                const deptsArr = Array.from(targetIds).map(id => ({ id, name: idToName[id], _sourceKey: historicalDataKey }));
                 deptsArr.sort((a, b) => {
                     if (a.id === selectedDept) return -1;
                     if (b.id === selectedDept) return 1;
@@ -243,6 +258,7 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
 
                     newTimelineData.push({
                         year: `${year}學年`,
+                        _sourceKey: historicalDataKey,
                         ranks: rankMap,
                         rawScores: rawScores,
                         names: yearNames, // ✨ 記錄當年度的真實名稱
@@ -251,6 +267,8 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
                         selectedDeptId: yearDeptId // ✨ 記錄該年度 selectedDept 的真實 ID
                     });
                 });
+
+                if (isCancelled) return;
 
                 newTimelineData.sort((a, b) => parseInt(a.year.replace(/\D/g, '')) - parseInt(b.year.replace(/\D/g, '')));
                 setTimelineRankDataState(newTimelineData);
@@ -261,6 +279,10 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
         };
 
         fetchHistoricalTrend();
+
+        return () => {
+            isCancelled = true;
+        };
     }, [selectedDept, selectedDimension, years, graphData, rankings]);
 
     // 2. 取得當前校系資訊
@@ -389,13 +411,18 @@ export const useHistoricalData = (selectedDept, selectedDimension, years, graphD
     // 5. 招生效益比較資料
     const healthData = useMemo(() => {
         if (!currentDeptInfo || !trendDepts.length) return [];
+        const toPercentOrNull = (value) => {
+            const parsed = parseNumber(value);
+            return parsed === null ? null : Number((parsed * 100).toFixed(1));
+        };
         return trendDepts.map(dept => {
             const info = rankings.find(r => r.id === dept.id) || {};
             return {
+                _sourceKey: dept._sourceKey,
                 name: dept.name,
-                yield_rate: info.yield_rate ? Number((info.yield_rate * 100).toFixed(1)) : 0,
-                zheng_effect: info.zheng_effect ? Number((info.zheng_effect * 100).toFixed(1)) : 0,
-                flow_rate: info.flow_rate ? Number((info.flow_rate * 100).toFixed(1)) : 0,
+                yield_rate: toPercentOrNull(info.yield_rate),
+                zheng_effect: toPercentOrNull(info.zheng_effect),
+                flow_rate: toPercentOrNull(info.flow_rate),
                 first_stage_thresholds: info.first_stage_thresholds || null,
                 first_stage_groups: info.first_stage_groups || null,
             };
