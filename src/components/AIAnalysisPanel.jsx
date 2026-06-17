@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const ANALYSIS_PROMPT_VERSION = 'data-null-guards-2026-06-17-v7';
+const ANALYSIS_PROMPT_VERSION = 'flow-rate-definition-2026-06-18-v8';
 
 // --- Helper Functions (replicating calculations for prompt construction) ---
 const parseNumber = (val) => {
@@ -412,6 +412,7 @@ const AIAnalysisPanel = ({
                 : `目前焦點年度是 ${currentYear || '當前'}學年度；若沒有前一年資料，請只做單年度分析，不要假裝有年增減。`;
 
             const comparisonBaseInstruction = `競爭對手比較基準：本次主要競爭對手以使用者目前點選的 ${currentYear}學年度競爭關係為基準；若分析跨年度趨勢，請先聲明此基準，並說明不同年度競爭對手可能變動。`;
+            const flowRateDefinitionInstruction = `【流入登分比例判讀規則】流入登分比例（FlowRate）是「甄審未填滿、後續流入登記分發的名額比例」，也就是缺額依賴度；它不是學生主動流入本系的偏好比例。此指標越低越好，越高代表甄審階段留才不足、較依賴登記分發補足名額，可能壓低錄取分數與最低錄取平均分數 PR。分析時禁止把高流入登分比例解讀成「大量考生選擇本系」、「吸引力較高」或正向流入。`;
 
             const analysisWritingRules = `
 【AI 敘述規則】
@@ -419,6 +420,7 @@ const AIAnalysisPanel = ({
 - 解釋要有前因後果：先說數據變化，再說與競爭對手相比的相對變化，最後才下判斷。若本系最低錄取平均分數上升，但競爭對手上升更快，要明確說「分數改善未有效轉換成學生選擇上的競爭優勢」。
 - ${yearContinuityInstruction}
 - ${comparisonBaseInstruction}
+- ${flowRateDefinitionInstruction}
 - 用圖表中既有詞彙描述：R-Score、最低錄取平均分數、最低錄取平均分數 PR、報到率、正取有效性、流入登分比例、一階篩選門檻、競爭對手。避免使用過度學術或圖表沒有出現的詞彙。
 - 一階篩選分析只能根據提供的門檻資料判斷；資料不足時請說「一階篩選門檻資料不足」，不要自行推測不存在的科目或倍率。
 - 不要只解釋圖表表面意義；如果有同時錄取後的流失、流入、一階篩選門檻與競爭對手資料，必須追問背後原因，例如「學生最後選了誰」、「是否因為一階篩選門檻高度重合」、「是否應降低與強勢競爭對手的一階篩選重合率」。
