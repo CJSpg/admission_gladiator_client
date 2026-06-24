@@ -12,6 +12,8 @@ import {
 } from 'recharts';
 
 const DEFAULT_EFFECT_YIELD_THRESHOLD = 80;
+const DEFAULT_FLOW_RATE_THRESHOLD = 20;
+const DEFAULT_AVG_SCORE_PR_THRESHOLD = 50;
 
 // --- Helper Functions ---
 
@@ -31,6 +33,11 @@ export const parseNumber = (val) => {
  */
 export const normalizeName = (name) => {
     return (name || "").replace(/\n/g, '').replace(/\s+/g, '').trim();
+};
+
+const getSchoolName = (name) => {
+    if (!name) return '';
+    return String(name).split('\n')[0]?.trim() || '';
 };
 
 /**
@@ -210,9 +217,60 @@ export const getQuadrantEffectYield = (
     }
 };
 
+/**
+ * Classifies coordinates into quadrants for school-internal department comparison.
+ * X axis: flow_rate_percent
+ * Y axis: avg_score_pr
+ */
+const getQuadrantFlowAvgPr = (
+    flowRatePercent,
+    avgScorePr,
+    flowThreshold = DEFAULT_FLOW_RATE_THRESHOLD,
+    avgPrThreshold = DEFAULT_AVG_SCORE_PR_THRESHOLD
+) => {
+    if (flowRatePercent === null || avgScorePr === null || flowRatePercent === undefined || avgScorePr === undefined) {
+        return { name: '資料不足', desc: '無法判斷校內系科象限' };
+    }
+
+    const flowThresholdText = `${flowThreshold}%`;
+    const avgThresholdText = `${avgPrThreshold}`;
+
+    if (flowRatePercent >= flowThreshold && avgScorePr >= avgPrThreshold) {
+        return {
+            name: '第一象限：考試支撐型',
+            desc: `流入登分比例達 ${flowThresholdText} 以上，但最低錄取平均分數 PR 仍達 ${avgThresholdText} 以上。這代表甄選階段留才或推甄轉換可能偏弱，但登記分發仍能招到分數品質不錯的學生，顯示該系具備與較高競爭層級校系抗衡的本錢。`
+        };
+    }
+    if (flowRatePercent < flowThreshold && avgScorePr >= avgPrThreshold) {
+        return {
+            name: '第二象限：強勢穩健型',
+            desc: `流入登分比例低於 ${flowThresholdText}，且最低錄取平均分數 PR 達 ${avgThresholdText} 以上。這是最理想的位置，代表甄選階段轉換穩定，同時錄取分數品質也高，系科體質與招生策略都相對健康。`
+        };
+    }
+    if (flowRatePercent < flowThreshold && avgScorePr < avgPrThreshold) {
+        return {
+            name: '第三象限：先招防守型',
+            desc: `流入登分比例低於 ${flowThresholdText}，但最低錄取平均分數 PR 低於 ${avgThresholdText}。這通常表示系科採取先招先贏策略，可能透過較低或較保守的一階門檻先把名額補滿；策略方向可以理解，但長期隱憂是系科體質與分數競爭力仍需提升。`
+        };
+    }
+    return {
+        name: '第四象限：雙弱警戒型',
+        desc: `流入登分比例達 ${flowThresholdText} 以上，且最低錄取平均分數 PR 低於 ${avgThresholdText}。這是最需要優先處理的位置，代表甄選階段留才不足，後續登記分發也未能拉高錄取分數品質，系科在少子化壓力下的抵抗力相對不足。`
+    };
+};
+
 // --- Custom Tooltip Component ---
 
-const CustomTooltip = ({ active, payload, selectedDept, mode, zhengEffectThreshold, yieldRateThreshold }) => {
+const CustomTooltip = ({
+    active,
+    payload,
+    selectedDept,
+    mode,
+    zhengEffectThreshold,
+    yieldRateThreshold,
+    flowRateThreshold,
+    avgScorePrThreshold
+}) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         if (!data) return null;
@@ -257,7 +315,7 @@ const CustomTooltip = ({ active, payload, selectedDept, mode, zhengEffectThresho
                     </div>
                 </div>
             );
-        } else {
+        } else if (mode === 'effect_yield') {
             // Mode: effect_yield
             const zhengEffectPercent = data.zheng_effect_percent !== undefined ? data.zheng_effect_percent : data.x;
             const yieldRatePercent = data.yield_rate_percent !== undefined ? data.yield_rate_percent : data.y;
@@ -296,6 +354,43 @@ const CustomTooltip = ({ active, payload, selectedDept, mode, zhengEffectThresho
                     </div>
                 </div>
             );
+        } else {
+            const flowRatePercent = data.flow_rate_percent !== undefined ? data.flow_rate_percent : data.x;
+            const avgScorePr = data.avg_score_pr !== undefined ? data.avg_score_pr : data.y;
+            const quadrant = getQuadrantFlowAvgPr(flowRatePercent, avgScorePr, flowRateThreshold, avgScorePrThreshold);
+
+            return (
+                <div style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(4px)',
+                    border: '1px solid rgba(224, 224, 224, 0.8)',
+                    padding: '15px',
+                    borderRadius: '10px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    fontSize: '13px',
+                    color: '#2c3e50',
+                    minWidth: '260px'
+                }}>
+                    <div style={{ fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: '8px', marginBottom: '8px', fontSize: '14px', lineHeight: '1.4' }}>
+                        {data.name ? data.name.split('\n').map((line, i) => <div key={i}>{line}</div>) : '--'}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div>🔻 流入登分比例：<strong style={{ color: '#e74c3c' }}>{flowRatePercent != null ? `${flowRatePercent.toFixed(1)}%` : '--'}</strong></div>
+                        <div>⭐ 最低錄取平均分數 PR：<strong style={{ color: '#2ecc71' }}>{avgScorePr != null ? avgScorePr.toFixed(1) : '--'}</strong></div>
+                        <div>📝 平均分數：<strong>{data.avg_score != null ? data.avg_score.toFixed(3) : '--'}</strong></div>
+                        {isSelf ? (
+                            <div style={{ color: '#ef4444', fontWeight: 'bold', marginTop: '4px' }}>📍 目前選取校系</div>
+                        ) : (
+                            <div style={{ color: '#475569', marginTop: '4px' }}>
+                                🏫 同校系科比較對象
+                            </div>
+                        )}
+                        <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed #eee', fontWeight: 'bold', color: '#e74c3c' }}>
+                            📍 象限：{quadrant.name}
+                        </div>
+                    </div>
+                </div>
+            );
         }
     }
     return null;
@@ -312,16 +407,18 @@ const PlacementQuadrantChart = ({
     selectedDept,
     selectedDimension,
     years,
-    currentYear,
-    myLabel,
     graphData,
     trendDepts,
     zhengEffectThreshold = DEFAULT_EFFECT_YIELD_THRESHOLD,
     setZhengEffectThreshold,
     yieldRateThreshold = DEFAULT_EFFECT_YIELD_THRESHOLD,
-    setYieldRateThreshold
+    setYieldRateThreshold,
+    flowRateThreshold = DEFAULT_FLOW_RATE_THRESHOLD,
+    setFlowRateThreshold,
+    avgScorePrThreshold = DEFAULT_AVG_SCORE_PR_THRESHOLD,
+    setAvgScorePrThreshold
 }) => {
-    // Mode switcher: 'rscore_avg' (R-score PR vs Avg Score PR) or 'effect_yield' (Zheng effect vs Yield rate)
+    // Mode switcher: 'rscore_avg', 'effect_yield', or 'flow_avg_pr'
     const [localMode, setLocalMode] = useState('rscore_avg');
     const mode = propsMode !== undefined ? propsMode : localMode;
     const setMode = propsSetMode !== undefined ? propsSetMode : setLocalMode;
@@ -336,6 +433,14 @@ const PlacementQuadrantChart = ({
     const normalizedYieldRateThreshold = Number.isFinite(yieldThresholdNumber)
         ? Math.min(100, Math.max(0, yieldThresholdNumber))
         : DEFAULT_EFFECT_YIELD_THRESHOLD;
+    const flowThresholdNumber = Number(flowRateThreshold);
+    const avgPrThresholdNumber = Number(avgScorePrThreshold);
+    const normalizedFlowRateThreshold = Number.isFinite(flowThresholdNumber)
+        ? Math.min(100, Math.max(0, flowThresholdNumber))
+        : DEFAULT_FLOW_RATE_THRESHOLD;
+    const normalizedAvgScorePrThreshold = Number.isFinite(avgPrThresholdNumber)
+        ? Math.min(100, Math.max(0, avgPrThresholdNumber))
+        : DEFAULT_AVG_SCORE_PR_THRESHOLD;
 
     const updateZhengEffectThreshold = (value) => {
         if (!setZhengEffectThreshold) return;
@@ -347,6 +452,18 @@ const PlacementQuadrantChart = ({
         if (!setYieldRateThreshold) return;
         const nextValue = Math.min(100, Math.max(0, Number(value) || 0));
         setYieldRateThreshold(nextValue);
+    };
+
+    const updateFlowRateThreshold = (value) => {
+        if (!setFlowRateThreshold) return;
+        const nextValue = Math.min(100, Math.max(0, Number(value) || 0));
+        setFlowRateThreshold(nextValue);
+    };
+
+    const updateAvgScorePrThreshold = (value) => {
+        if (!setAvgScorePrThreshold) return;
+        const nextValue = Math.min(100, Math.max(0, Number(value) || 0));
+        setAvgScorePrThreshold(nextValue);
     };
 
     // Clear compared competitors on department or dimension change
@@ -367,6 +484,7 @@ const PlacementQuadrantChart = ({
                 const avgScore = parseNumber(item.avg_score);
                 const yieldRate = parseNumber(item.yield_rate);
                 const zhengEffect = parseNumber(item.zheng_effect);
+                const flowRate = parseNumber(item.flow_rate);
 
                 return {
                     id: item.id,
@@ -379,7 +497,8 @@ const PlacementQuadrantChart = ({
                     zheng_effect: zhengEffect,
                     yield_rate_percent: yieldRate !== null ? yieldRate * 100 : null,
                     zheng_effect_percent: zhengEffect !== null ? zhengEffect * 100 : null,
-                    flow_rate: parseNumber(item.flow_rate)
+                    flow_rate: flowRate,
+                    flow_rate_percent: flowRate !== null ? flowRate * 100 : null
                 };
             })
             .filter(Boolean);
@@ -423,9 +542,12 @@ const PlacementQuadrantChart = ({
                 if (mode === 'rscore_avg') {
                     x = d.r_score_pr;
                     y = d.avg_score_pr;
-                } else {
+                } else if (mode === 'effect_yield') {
                     x = d.zheng_effect_percent;
                     y = d.yield_rate_percent;
+                } else {
+                    x = d.flow_rate_percent;
+                    y = d.avg_score_pr;
                 }
 
                 if (x === null || y === null) return null;
@@ -440,6 +562,20 @@ const PlacementQuadrantChart = ({
             .filter(Boolean);
 
         const selectedPoint = mappedData.find(d => d.id === selectedDept);
+
+        if (mode === 'flow_avg_pr') {
+            const selectedSchoolName = getSchoolName(selectedPoint?.name || processedRankings.find(d => d.id === selectedDept)?.name);
+            const sameSchoolPoints = mappedData
+                .filter(d => d.id !== selectedDept && getSchoolName(d.name) === selectedSchoolName)
+                .sort((a, b) => {
+                    if (b.y !== a.y) return b.y - a.y;
+                    return a.x - b.x;
+                });
+
+            return selectedPoint
+                ? [selectedPoint, ...sameSchoolPoints]
+                : sameSchoolPoints;
+        }
 
         const competitorPoints = mappedData
             .filter(d => d.id !== selectedDept && relatedIds.has(d.id))
@@ -513,6 +649,20 @@ const PlacementQuadrantChart = ({
                     const avgScorePr = parseNumber(yearDept.avg_score_pr);
                     const yieldRate = parseNumber(yearDept.yield_rate);
                     const zhengEffect = parseNumber(yearDept.zheng_effect);
+                    const flowRate = parseNumber(yearDept.flow_rate);
+                    let x = null;
+                    let y = null;
+
+                    if (mode === 'rscore_avg') {
+                        x = rScorePr;
+                        y = avgScorePr;
+                    } else if (mode === 'effect_yield') {
+                        x = zhengEffect !== null ? zhengEffect * 100 : null;
+                        y = yieldRate !== null ? yieldRate * 100 : null;
+                    } else {
+                        x = flowRate !== null ? flowRate * 100 : null;
+                        y = avgScorePr;
+                    }
 
                     return {
                         year: String(year),
@@ -520,12 +670,13 @@ const PlacementQuadrantChart = ({
                         avgScorePr,
                         zhengEffectPercent: zhengEffect !== null ? zhengEffect * 100 : null,
                         yieldRatePercent: yieldRate !== null ? yieldRate * 100 : null,
+                        flowRatePercent: flowRate !== null ? flowRate * 100 : null,
                         r_score: parseNumber(yearDept.r_score),
                         avg_score: parseNumber(yearDept.avg_score),
                         name: yearDept.name,
                         id: yearDept.id,
-                        x: mode === 'rscore_avg' ? rScorePr : (zhengEffect !== null ? zhengEffect * 100 : null),
-                        y: mode === 'rscore_avg' ? avgScorePr : (yieldRate !== null ? yieldRate * 100 : null)
+                        x,
+                        y
                     };
                 })
                 .filter(point => point && point.x !== null && point.y !== null);
@@ -568,80 +719,6 @@ const PlacementQuadrantChart = ({
     const otherPoints = finalChartData.filter(item => item.id !== selectedDept);
     const currentDeptPoint = finalChartData.find(item => item.id === selectedDept);
 
-    // Current quadrant info
-    const quadrantInfo = currentDeptPoint
-        ? (mode === 'rscore_avg'
-            ? getQuadrantRScoreAvg(currentDeptPoint.x, currentDeptPoint.y)
-            : getQuadrantEffectYield(currentDeptPoint.x, currentDeptPoint.y, normalizedZhengEffectThreshold, normalizedYieldRateThreshold))
-        : null;
-
-    // Generate YoY movement analysis
-    const generateTrendAnalysis = (path, currentMode) => {
-        if (!path || path.length < 2) return null;
-
-        const earliest = path[0];
-        const latest = path[path.length - 1];
-
-        const threshold = 1.0;
-
-        if (currentMode === 'rscore_avg') {
-            const deltaX = latest.rScorePr - earliest.rScorePr;
-            const deltaY = latest.avgScorePr - earliest.avgScorePr;
-            const xFlat = Math.abs(deltaX) < threshold;
-            const yFlat = Math.abs(deltaY) < threshold;
-
-            let analysis = "";
-            if (xFlat && yFlat) {
-                analysis = "招生競爭力與錄取分數品質均呈現持平穩定態勢。";
-            } else if (xFlat) {
-                analysis = `招生競爭力（R-Score PR）呈現持平，而平均分數 PR ${deltaY > 0 ? "提升" : "下降"}，整體招生定位呈現${deltaY > 0 ? "穩定偏好" : "待加強"}。`;
-            } else if (yFlat) {
-                analysis = `平均分數 PR 呈現持平，而招生競爭力（R-Score PR）${deltaX > 0 ? "提升" : "下降"}，顯示整體招生競爭位置${deltaX > 0 ? "改善" : "轉弱"}。`;
-            } else if (deltaX > 0 && deltaY > 0) {
-                analysis = "招生競爭力與錄取分數品質同步提升，整體落點朝正向發展。";
-            } else if (deltaX > 0 && deltaY < 0) {
-                analysis = "R-Score PR 提升，代表招生競爭位置改善，但平均分數 PR 下降，顯示整體競爭力提升未完全反映在錄取分數品質上，需進一步檢視招生來源與學生組成。";
-            } else if (deltaX < 0 && deltaY > 0) {
-                analysis = "平均分數 PR 提升，但 R-Score PR 下降，表示錄取分數品質尚有支撐，但整體招生競爭位置轉弱，可能受到競爭校系、學生流動或市場偏好變化影響。";
-            } else if (deltaX < 0 && deltaY < 0) {
-                analysis = "招生競爭力與錄取分數品質皆下降，整體落點朝弱勢方向移動，應優先檢討招生策略。";
-            }
-
-            return {
-                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：${analysis}（R-Score PR ${deltaX > 0 ? '提升' : '變化'} ${deltaX.toFixed(1)}，平均分數 PR ${deltaY > 0 ? '提升' : '變化'} ${deltaY.toFixed(1)}）`
-            };
-        } else {
-            // Mode: effect_yield
-            const deltaX = latest.zhengEffectPercent - earliest.zhengEffectPercent;
-            const deltaY = latest.yieldRatePercent - earliest.yieldRatePercent;
-            const xFlat = Math.abs(deltaX) < threshold;
-            const yFlat = Math.abs(deltaY) < threshold;
-
-            let analysis = "";
-            if (xFlat && yFlat) {
-                analysis = "正取有效性與報到率均呈現持平穩定態勢。";
-            } else if (xFlat) {
-                analysis = `正取有效性呈現持平，而報到率 ${deltaY > 0 ? "提升" : "下降"}，招生穩定度呈現${deltaY > 0 ? "改善" : "轉弱"}。`;
-            } else if (yFlat) {
-                analysis = `報到率呈現持平，而正取有效性 ${deltaX > 0 ? "提升" : "下降"}，顯示正取生就讀意願${deltaX > 0 ? "提高" : "降低"}。`;
-            } else if (deltaX > 0 && deltaY > 0) {
-                analysis = "正取有效性與報到率同步提升，招生精準度與轉換效益朝正向發展。";
-            } else if (deltaX > 0 && deltaY < 0) {
-                analysis = "正取有效性提升，但報到率下降，顯示正取生雖然就讀意願高，但可能因為備取名額不足或缺額，使得最終報到率偏低。";
-            } else if (deltaX < 0 && deltaY > 0) {
-                analysis = "報到率提升，但正取有效性下降，顯示正取生流失較多，但成功透過備取遞補穩定了報到率，對備取之依賴度增加。";
-            } else if (deltaX < 0 && deltaY < 0) {
-                analysis = "正取有效性與報到率皆下降，整體招生精準度與轉換率轉弱，建議檢討招生宣傳與正備取策略。";
-            }
-
-            return {
-                analysisText: `歷年分析（自 ${earliest.year} 至 ${latest.year} 學年）：${analysis}（正取有效性 ${deltaX > 0 ? '提升' : '變化'} ${deltaX.toFixed(1)}%，報到率 ${deltaY > 0 ? '提升' : '變化'} ${deltaY.toFixed(1)}%）`
-            };
-        }
-    };
-
-    const trendAnalysis = generateTrendAnalysis(historicalPath, mode);
-
     // Calculate dynamic domains and ticks depending on mode
     let xDomain, yDomain, xTicks, yTicks;
 
@@ -682,29 +759,54 @@ const PlacementQuadrantChart = ({
             yTicks.push(i);
         }
     } else {
-        // Mode: effect_yield (Keep full 0 - 100 scale, with standard ticks)
+        // Percent-based quadrant modes keep full 0 - 100 scale with standard ticks.
         xDomain = [0, 100];
         yDomain = [0, 100];
         xTicks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
         yTicks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
     }
 
+    const chartTitle = mode === 'rscore_avg'
+        ? 'R-Score 與最低錄取平均分數 PR 分佈落點分析'
+        : mode === 'effect_yield'
+            ? '正取有效性與報到率四象限分析'
+            : '校內各系流入登分比例與最低錄取平均分數 PR 分析';
+    const chartSubtitle = mode === 'rscore_avg'
+        ? '僅顯示目前校系組及其直接競爭／流動關係校系組；PR 值仍以完整同年度資料計算。'
+        : mode === 'effect_yield'
+            ? '分析正取學生的就讀意願（正取有效性）與最終招生填滿度（報到率）之關係。'
+            : selectedDimension === 'dept'
+                ? '比較同校其他系科是否往左上方移動：流入登分比例下降、最低錄取平均分數 PR 上升。'
+                : '此模式以校內各系比較為主，建議切到「系」層級使用；目前會先依現有層級資料呈現。';
+    const xAxisName = mode === 'rscore_avg'
+        ? 'R-Score PR'
+        : mode === 'effect_yield'
+            ? '正取有效性'
+            : '流入登分比例';
+    const xAxisLabel = mode === 'rscore_avg'
+        ? 'R-Score PR'
+        : mode === 'effect_yield'
+            ? '正取有效性（%）'
+            : '流入登分比例（%）';
+    const yAxisName = mode === 'effect_yield' ? '報到率' : '最低錄取平均分數 PR';
+    const yAxisLabel = mode === 'effect_yield' ? '報到率（%）' : '最低錄取平均分數 PR';
+    const xTickFormatter = (v) => mode === 'rscore_avg' ? Math.round(v) : `${Math.round(v)}%`;
+    const yTickFormatter = (v) => mode === 'effect_yield' ? `${Math.round(v)}%` : Math.round(v);
+
     return (
         <div className="chart-wrapper" style={{ display: 'flex', flexDirection: 'column', padding: '10px' }}>
             {/* Header info */}
             <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                 <h3 style={{ margin: '0 0 5px 0', fontSize: '18px', color: '#2c3e50', fontWeight: 'bold' }}>
-                    {mode === 'rscore_avg' ? "R-Score 與最低錄取平均分數 PR 分佈落點分析" : "正取有效性與報到率四象限分析"}
+                    {chartTitle}
                 </h3>
                 <p style={{ margin: 0, fontSize: '13px', color: '#7f8c8d', lineHeight: '1.5' }}>
-                    {mode === 'rscore_avg'
-                        ? "僅顯示目前校系組及其直接競爭／流動關係校系組；PR 值仍以完整同年度資料計算。"
-                        : "分析正取學生的就讀意願（正取有效性）與最終招生填滿度（報到率）之關係。"}
+                    {chartSubtitle}
                 </p>
             </div>
 
             {/* Premium Toggle Button Switcher */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
                 <button
                     onClick={() => setMode('rscore_avg')}
                     style={{
@@ -739,9 +841,26 @@ const PlacementQuadrantChart = ({
                 >
                     🛡️ 正取有效性與報到率
                 </button>
+                <button
+                    onClick={() => setMode('flow_avg_pr')}
+                    style={{
+                        padding: '8px 18px',
+                        borderRadius: '20px',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: mode === 'flow_avg_pr' ? '#e74c3c' : '#fff',
+                        color: mode === 'flow_avg_pr' ? '#fff' : '#64748b',
+                        boxShadow: mode === 'flow_avg_pr' ? '0 4px 12px rgba(231, 76, 60, 0.2)' : 'none'
+                    }}
+                >
+                    🏫 校內系科體質
+                </button>
             </div>
 
-            {mode === 'effect_yield' && (
+            {(mode === 'effect_yield' || mode === 'flow_avg_pr') && (
                 <div style={{
                     display: 'flex',
                     justifyContent: 'center',
@@ -752,22 +871,43 @@ const PlacementQuadrantChart = ({
                     fontSize: '13px',
                     color: '#475569'
                 }}>
-                    {[
-                        {
-                            id: 'zheng-effect-threshold',
-                            label: '正取有效性門檻',
-                            value: normalizedZhengEffectThreshold,
-                            update: updateZhengEffectThreshold,
-                            color: '#2ecc71'
-                        },
-                        {
-                            id: 'yield-rate-threshold',
-                            label: '報到率門檻',
-                            value: normalizedYieldRateThreshold,
-                            update: updateYieldRateThreshold,
-                            color: '#3498db'
-                        }
-                    ].map(control => (
+                    {(mode === 'effect_yield'
+                        ? [
+                            {
+                                id: 'zheng-effect-threshold',
+                                label: '正取有效性門檻',
+                                value: normalizedZhengEffectThreshold,
+                                update: updateZhengEffectThreshold,
+                                color: '#2ecc71',
+                                suffix: '%'
+                            },
+                            {
+                                id: 'yield-rate-threshold',
+                                label: '報到率門檻',
+                                value: normalizedYieldRateThreshold,
+                                update: updateYieldRateThreshold,
+                                color: '#3498db',
+                                suffix: '%'
+                            }
+                        ]
+                        : [
+                            {
+                                id: 'flow-rate-threshold',
+                                label: '流入登分比例門檻',
+                                value: normalizedFlowRateThreshold,
+                                update: updateFlowRateThreshold,
+                                color: '#e74c3c',
+                                suffix: '%'
+                            },
+                            {
+                                id: 'avg-score-pr-threshold',
+                                label: '最低錄取平均分數 PR 門檻',
+                                value: normalizedAvgScorePrThreshold,
+                                update: updateAvgScorePrThreshold,
+                                color: '#2ecc71',
+                                suffix: ''
+                            }
+                        ]).map(control => (
                         <div key={control.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <label htmlFor={control.id} style={{ fontWeight: 'bold', color: '#334155' }}>
                                 {control.label}
@@ -798,14 +938,19 @@ const PlacementQuadrantChart = ({
                                     fontWeight: 'bold'
                                 }}
                             />
-                            <span>%</span>
+                            {control.suffix && <span>{control.suffix}</span>}
                         </div>
                     ))}
                     <button
                         type="button"
                         onClick={() => {
-                            updateZhengEffectThreshold(DEFAULT_EFFECT_YIELD_THRESHOLD);
-                            updateYieldRateThreshold(DEFAULT_EFFECT_YIELD_THRESHOLD);
+                            if (mode === 'effect_yield') {
+                                updateZhengEffectThreshold(DEFAULT_EFFECT_YIELD_THRESHOLD);
+                                updateYieldRateThreshold(DEFAULT_EFFECT_YIELD_THRESHOLD);
+                            } else {
+                                updateFlowRateThreshold(DEFAULT_FLOW_RATE_THRESHOLD);
+                                updateAvgScorePrThreshold(DEFAULT_AVG_SCORE_PR_THRESHOLD);
+                            }
                         }}
                         style={{
                             padding: '5px 10px',
@@ -848,13 +993,13 @@ const PlacementQuadrantChart = ({
                         <XAxis
                             type="number"
                             dataKey="x"
-                            name={mode === 'rscore_avg' ? "R-Score PR" : "正取有效性"}
+                            name={xAxisName}
                             domain={xDomain}
                             ticks={xTicks}
-                            tickFormatter={(v) => mode === 'rscore_avg' ? Math.round(v) : `${Math.round(v)}%`}
+                            tickFormatter={xTickFormatter}
                             tick={{ fontSize: 11, fill: '#64748b' }}
                             label={{
-                                value: mode === 'rscore_avg' ? 'R-Score PR' : '正取有效性（%）',
+                                value: xAxisLabel,
                                 position: 'bottom',
                                 offset: 5,
                                 fontSize: 13,
@@ -867,13 +1012,13 @@ const PlacementQuadrantChart = ({
                         <YAxis
                             type="number"
                             dataKey="y"
-                            name={mode === 'rscore_avg' ? "最低錄取平均分數 PR" : "報到率"}
+                            name={yAxisName}
                             domain={yDomain}
                             ticks={yTicks}
-                            tickFormatter={(v) => mode === 'rscore_avg' ? Math.round(v) : `${Math.round(v)}%`}
+                            tickFormatter={yTickFormatter}
                             tick={{ fontSize: 11, fill: '#64748b' }}
                             label={{
-                                value: mode === 'rscore_avg' ? '最低錄取平均分數 PR' : '報到率（%）',
+                                value: yAxisLabel,
                                 angle: -90,
                                 position: 'insideLeft',
                                 offset: 0,
@@ -953,6 +1098,74 @@ const PlacementQuadrantChart = ({
                             </>
                         )}
 
+                        {mode === 'flow_avg_pr' && (
+                            <>
+                                {/* Q1: high flow, high PR */}
+                                <ReferenceArea
+                                    x1={normalizedFlowRateThreshold}
+                                    x2={100}
+                                    y1={normalizedAvgScorePrThreshold}
+                                    y2={100}
+                                    fill="rgba(241, 196, 15, 0.025)"
+                                    label={{
+                                        value: "第一象限：考試支撐型",
+                                        position: "insideTopRight",
+                                        fill: "rgba(211, 84, 0, 0.5)",
+                                        fontSize: 11,
+                                        fontWeight: "bold"
+                                    }}
+                                />
+                                {/* Q2: low flow, high PR */}
+                                <ReferenceArea
+                                    x1={0}
+                                    x2={normalizedFlowRateThreshold}
+                                    y1={normalizedAvgScorePrThreshold}
+                                    y2={100}
+                                    fill="rgba(46, 204, 113, 0.025)"
+                                    label={{
+                                        value: "第二象限：強勢穩健型",
+                                        position: "insideTopLeft",
+                                        fill: "rgba(39, 174, 96, 0.5)",
+                                        fontSize: 11,
+                                        fontWeight: "bold"
+                                    }}
+                                />
+                                {/* Q3: low flow, low PR */}
+                                <ReferenceArea
+                                    x1={0}
+                                    x2={normalizedFlowRateThreshold}
+                                    y1={0}
+                                    y2={normalizedAvgScorePrThreshold}
+                                    fill="rgba(52, 152, 219, 0.02)"
+                                    label={{
+                                        value: "第三象限：先招防守型",
+                                        position: "insideBottomLeft",
+                                        fill: "rgba(41, 128, 185, 0.5)",
+                                        fontSize: 11,
+                                        fontWeight: "bold"
+                                    }}
+                                />
+                                {/* Q4: high flow, low PR */}
+                                <ReferenceArea
+                                    x1={normalizedFlowRateThreshold}
+                                    x2={100}
+                                    y1={0}
+                                    y2={normalizedAvgScorePrThreshold}
+                                    fill="rgba(231, 76, 60, 0.025)"
+                                    label={{
+                                        value: "第四象限：雙弱警戒型",
+                                        position: "insideBottomRight",
+                                        fill: "rgba(192, 57, 43, 0.55)",
+                                        fontSize: 11,
+                                        fontWeight: "bold"
+                                    }}
+                                />
+
+                                <ReferenceLine x={normalizedFlowRateThreshold} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
+                                <ReferenceLine y={normalizedAvgScorePrThreshold} stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="3 3" />
+                            </>
+                        )}
+
                         {/* Tooltip */}
                         <Tooltip
                             content={(
@@ -961,6 +1174,8 @@ const PlacementQuadrantChart = ({
                                     mode={mode}
                                     zhengEffectThreshold={normalizedZhengEffectThreshold}
                                     yieldRateThreshold={normalizedYieldRateThreshold}
+                                    flowRateThreshold={normalizedFlowRateThreshold}
+                                    avgScorePrThreshold={normalizedAvgScorePrThreshold}
                                 />
                             )}
                             cursor={{ strokeDasharray: '3 3', stroke: '#94a3b8' }}
@@ -1108,7 +1323,7 @@ const PlacementQuadrantChart = ({
                 <div style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '10px', userSelect: 'none' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <h4 style={{ margin: 0, color: '#2c3e50', fontSize: '14px', fontWeight: 'bold' }}>
-                            🔍 對手軌跡比對（點擊或勾選，最多顯示 5 個）
+                            🔍 {mode === 'flow_avg_pr' ? '校內系科軌跡比對' : '對手軌跡比對'}（點擊或勾選，最多顯示 5 個）
                         </h4>
                         {comparedDepts.length > 0 && (
                             <button

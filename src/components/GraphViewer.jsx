@@ -16,6 +16,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
     const [quadrantMode, setQuadrantMode] = useState('rscore_avg');
     const [zhengEffectThreshold, setZhengEffectThreshold] = useState(80);
     const [yieldRateThreshold, setYieldRateThreshold] = useState(80);
+    const [flowRateThreshold, setFlowRateThreshold] = useState(20);
+    const [avgScorePrThreshold, setAvgScorePrThreshold] = useState(50);
 
     // 當切換圖表分頁時，將子分頁狀態重設回預設值
     useEffect(() => {
@@ -116,6 +118,10 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                                 setZhengEffectThreshold={setZhengEffectThreshold}
                                 yieldRateThreshold={yieldRateThreshold}
                                 setYieldRateThreshold={setYieldRateThreshold}
+                                flowRateThreshold={flowRateThreshold}
+                                setFlowRateThreshold={setFlowRateThreshold}
+                                avgScorePrThreshold={avgScorePrThreshold}
+                                setAvgScorePrThreshold={setAvgScorePrThreshold}
                             />
                         )}
 
@@ -158,6 +164,8 @@ const GraphViewer = ({ selectedDept, graphData, rankings, years, selectedDimensi
                             timelineRankData={timelineRankData}
                             zhengEffectThreshold={zhengEffectThreshold}
                             yieldRateThreshold={yieldRateThreshold}
+                            flowRateThreshold={flowRateThreshold}
+                            avgScorePrThreshold={avgScorePrThreshold}
                         />
                     </div>
                 </>

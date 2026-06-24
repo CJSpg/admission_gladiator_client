@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const ANALYSIS_PROMPT_VERSION = 'flow-rate-definition-2026-06-18-v8';
+const ANALYSIS_PROMPT_VERSION = 'school-flow-pr-quadrant-2026-06-25-v1';
 
 // --- Helper Functions (replicating calculations for prompt construction) ---
 const parseNumber = (val) => {
@@ -260,7 +260,9 @@ const AIAnalysisPanel = ({
     healthData,
     timelineRankData,
     zhengEffectThreshold = 80,
-    yieldRateThreshold = 80
+    yieldRateThreshold = 80,
+    flowRateThreshold = 20,
+    avgScorePrThreshold = 50
 }) => {
     const [analysisCache, setAnalysisCache] = useState({});
     const analysisCacheRef = useRef({});
@@ -332,6 +334,8 @@ const AIAnalysisPanel = ({
             const targetRS = parseNumber(targetRScoreValue) === null ? 'N/A' : String(targetRScoreValue);
             const zhengEffectThresholdText = `${zhengEffectThreshold}%`;
             const yieldRateThresholdText = `${yieldRateThreshold}%`;
+            const flowRateThresholdText = `${flowRateThreshold}%`;
+            const avgScorePrThresholdText = `${avgScorePrThreshold}`;
 
             const formatMetricValue = (value, digits = 1, suffix = '') => {
                 const num = parseNumber(value);
@@ -845,6 +849,108 @@ ${comparisonBaseInstruction}
                 const currentYieldValue = parseNumber(currentDeptInfo?.yield_rate);
                 const currentZheng = currentZhengValue !== null ? (currentZhengValue * 100).toFixed(1) : 'N/A';
                 const currentYield = currentYieldValue !== null ? (currentYieldValue * 100).toFixed(1) : 'N/A';
+                const currentFlowValue = parseNumber(currentDeptInfo?.flow_rate);
+                const currentFlow = currentFlowValue !== null ? (currentFlowValue * 100).toFixed(1) : 'N/A';
+                const currentFlowText = currentFlowValue !== null ? `${currentFlow}%` : 'N/A';
+
+                const normalizeLoose = (value) => (value || '').replace(/\n/g, '').replace(/\s+/g, '').trim();
+                const getSchoolNameFromItem = (item) => {
+                    const name = typeof item === 'string' ? item : item?.name;
+                    return (name || '').split('\n')[0]?.trim() || '';
+                };
+                const selectedSchoolName = getSchoolNameFromItem(selfPr || currentDeptInfo);
+                const classifyFlowAvgPr = (flowPercent, avgPr) => {
+                    if (flowPercent === null || avgPr === null || flowPercent === undefined || avgPr === undefined) return '資料不足';
+                    if (flowPercent >= flowRateThreshold && avgPr >= avgScorePrThreshold) return '第一象限：考試支撐型';
+                    if (flowPercent < flowRateThreshold && avgPr >= avgScorePrThreshold) return '第二象限：強勢穩健型';
+                    if (flowPercent < flowRateThreshold && avgPr < avgScorePrThreshold) return '第三象限：先招防守型';
+                    return '第四象限：雙弱警戒型';
+                };
+                const sameSchoolCurrentItems = bothPrData
+                    .filter(item => getSchoolNameFromItem(item) === selectedSchoolName)
+                    .map(item => {
+                        const flowValue = parseNumber(item.flow_rate);
+                        const flowPercent = flowValue !== null ? flowValue * 100 : null;
+                        return {
+                            id: item.id,
+                            name: getCleanName(item),
+                            normalizedName: normalizeLoose(item.name),
+                            flowPercent,
+                            avgScorePr: parseNumber(item.avg_score_pr),
+                            avgScore: parseNumber(item.avg_score),
+                            quadrant: classifyFlowAvgPr(flowPercent, parseNumber(item.avg_score_pr))
+                        };
+                    })
+                    .filter(item => item.flowPercent !== null && item.avgScorePr !== null)
+                    .sort((a, b) => {
+                        if (b.avgScorePr !== a.avgScorePr) return b.avgScorePr - a.avgScorePr;
+                        return a.flowPercent - b.flowPercent;
+                    });
+                const sameSchoolCurrentText = sameSchoolCurrentItems.length > 0
+                    ? sameSchoolCurrentItems.map(item =>
+                        `- ${item.name}${item.id === selectedDept ? '（目前選取）' : ''}: 流入登分比例 = ${item.flowPercent.toFixed(1)}%, 最低錄取平均分數 PR = ${item.avgScorePr}, 最低錄取平均分數 = ${formatPromptValue(item.avgScore)}, 象限 = ${item.quadrant}`
+                    ).join('\n')
+                    : '- 無同校系科資料';
+
+                const buildSchoolFlowTrendRows = async () => {
+                    const currentYearNumberForFlow = parseInt(currentYear, 10);
+                    const yearsForFlow = [...years]
+                        .filter(year => {
+                            const yearNumber = parseInt(year, 10);
+                            return !Number.isFinite(currentYearNumberForFlow) || yearNumber <= currentYearNumberForFlow;
+                        })
+                        .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+
+                    if (sameSchoolCurrentItems.length === 0 || yearsForFlow.length === 0) return ['- 無足夠歷年資料'];
+
+                    const yearlyRankings = await Promise.all(yearsForFlow.map(async (year) => {
+                        try {
+                            const response = await fetch(`${import.meta.env.BASE_URL}rankings_${year}_${selectedDimension}.json`);
+                            if (!response.ok) return { year, data: [] };
+                            const rawData = await response.json();
+                            const withRPr = calculatePercentileRank(rawData, 'r_score', 'r_score_pr');
+                            const withAPr = calculateAverageScorePercentileRank(withRPr, 'avg_score', 'avg_score_pr');
+                            return { year, data: withAPr };
+                        } catch {
+                            return { year, data: [] };
+                        }
+                    }));
+
+                    return sameSchoolCurrentItems.map(item => {
+                        const points = yearlyRankings
+                            .map(({ year, data }) => {
+                                const row = data.find(candidate => normalizeLoose(candidate.name) === item.normalizedName);
+                                if (!row) return null;
+                                const flowValue = parseNumber(row.flow_rate);
+                                const flowPercent = flowValue !== null ? flowValue * 100 : null;
+                                const avgScorePr = parseNumber(row.avg_score_pr);
+                                if (flowPercent === null || avgScorePr === null) return null;
+                                return { year, flowPercent, avgScorePr };
+                            })
+                            .filter(Boolean);
+
+                        if (points.length < 2) {
+                            const only = points[0];
+                            return only
+                                ? `- ${item.name}: 僅有 ${only.year} 年資料，流入登分比例 ${only.flowPercent.toFixed(1)}%, PR ${only.avgScorePr}`
+                                : `- ${item.name}: 無足夠歷年資料`;
+                        }
+
+                        const first = points[0];
+                        const latest = points[points.length - 1];
+                        const flowDelta = latest.flowPercent - first.flowPercent;
+                        const prDelta = latest.avgScorePr - first.avgScorePr;
+                        let direction = '變化有限';
+                        if (flowDelta < -1 && prDelta > 1) direction = '明顯往好方向走（左上移動）';
+                        else if (flowDelta > 1 && prDelta < -1) direction = '明顯往壞方向走（右下移動）';
+                        else if (flowDelta < -1 && prDelta <= 1) direction = '流入改善，但分數 PR 尚未跟上';
+                        else if (flowDelta >= -1 && prDelta > 1) direction = '分數 PR 改善，但流入比例尚未下降';
+                        else if (flowDelta > 1 && prDelta >= -1) direction = '流入依賴升高，需要注意';
+                        else if (flowDelta <= 1 && prDelta < -1) direction = '分數 PR 走弱，需要注意';
+
+                        return `- ${item.name}: ${first.year} → ${latest.year}，流入登分比例 ${first.flowPercent.toFixed(1)}% → ${latest.flowPercent.toFixed(1)}%（變化 ${flowDelta.toFixed(1)}%），最低錄取平均分數 PR ${first.avgScorePr} → ${latest.avgScorePr}（變化 ${prDelta.toFixed(1)}），判讀 = ${direction}`;
+                    });
+                };
 
                 const pathPoints = [];
                 historicalData.forEach(yrData => {
@@ -882,6 +988,55 @@ ${flowDiagnosticSummary}
 5. 【正備取名額優化建議】：
    - 應如何科學地調整正備取名額比例與備取倍率？
    - 在甄試面試設計、聯絡正備取生以及宣傳策略上，應採取什麼行動來提高正取就讀率或確保備取遞補成功，進而降低流入登分比例？請以條列方式提出具體操作建議。
+`;
+                } else if (qMode === 'flow_avg_pr') {
+                    const schoolFlowTrendRows = await buildSchoolFlowTrendRows();
+                    const dimensionNotice = selectedDimension === 'dept'
+                        ? '目前資料為科系層級，適合進行校內各系比較。'
+                        : `注意：此圖的設計目標是「科系層級」的校內比較；目前資料層級為${dimensionText}，請只依目前資料描述，不要延伸成系組細節。`;
+
+                    prompt = `
+請針對以下【校內各系流入登分比例 × 最低錄取平均分數 PR】四象限資料進行分析。這張圖不是要分析競爭對手或一階篩選高度重合，主要是要協助學校管理者判斷校內哪些系正在往好的方向走、哪些系需要優先調整。
+
+【分析主體資訊】
+- 目標${dimensionText}：${targetName}
+- 所屬學校：${selectedSchoolName || 'N/A'}
+- 當年度：${currentYear}學年度
+- 分析層級提醒：${dimensionNotice}
+
+【圖表門檻】
+- X 軸：流入登分比例，門檻 = ${flowRateThresholdText}
+- Y 軸：最低錄取平均分數 PR，門檻 = ${avgScorePrThresholdText}
+- 好方向定義：往左上方移動，也就是流入登分比例下降、最低錄取平均分數 PR 上升。
+- 最理想象限：第二象限（低流入、高 PR）。
+- 最需要優先處理象限：第四象限（高流入、低 PR）。
+
+【目前選取系的當年度資料】
+- 流入登分比例：${currentFlowText}
+- 最低錄取平均分數 PR：${currentAPr}
+- 最低錄取平均分數：${formatPromptValue(currentDeptInfo?.avg_score)}
+- 目前象限：${classifyFlowAvgPr(currentFlowValue !== null ? currentFlowValue * 100 : null, parseNumber(currentAPr))}
+
+【同校各系當年度位置】
+${sameSchoolCurrentText}
+
+【同校各系歷年移動方向】
+${schoolFlowTrendRows.join('\n')}
+
+象限類型定義：
+1. 【第一象限：考試支撐型】(流入登分比例 >= ${flowRateThresholdText}, 最低錄取平均分數 PR >= ${avgScorePrThresholdText})：甄選階段可能未能把人留住，所以流入比例偏高；但登記分發仍能招到 PR 較好的學生，表示系的體質不差。管理重點不是悲觀解讀，而是思考如何降低流入比例，讓它往第二象限移動。
+2. 【第二象限：強勢穩健型】(流入登分比例 < ${flowRateThresholdText}, 最低錄取平均分數 PR >= ${avgScorePrThresholdText})：這是最好狀態，代表甄選階段能留住學生，分發端也維持較高分數品質。
+3. 【第三象限：先招防守型】(流入登分比例 < ${flowRateThresholdText}, 最低錄取平均分數 PR < ${avgScorePrThresholdText})：流入比例低，可能代表先招先贏策略有效；但 PR 偏低，代表系科體質與分數競爭力仍需拉升。這個策略在短期是合理的，但少子化下抗壓性不足。
+4. 【第四象限：雙弱警戒型】(流入登分比例 >= ${flowRateThresholdText}, 最低錄取平均分數 PR < ${avgScorePrThresholdText})：這是最差狀態，表示甄選階段留才不足，後續分發也沒有招到相對高 PR 的學生，應列為優先改善對象。
+
+請幫校方輸出以下內容：
+1. 【校內整體盤點】：同校各系目前主要集中在哪些象限？第二象限與第四象限各有哪些系？
+2. 【是否往好方向走】：根據歷年移動方向，指出哪些系是「流入下降且 PR 上升」的明顯改善案例，哪些系是「流入上升且 PR 下降」的惡化案例。
+3. 【第一象限判讀】：若有系落在第一象限，請說明它不是體質差，而是分發端仍有能力招到好學生；管理重點是降低流入登分比例，把它推往第二象限。
+4. 【第三象限判讀】：若有系落在第三象限，請說明它可能是先招先贏策略，但下一步應提升最低錄取平均分數 PR，否則少子化壓力下抗壓性有限。
+5. 【優先輔導清單】：請依「第四象限優先、右下移動優先、PR 連續下降優先」列出校方應優先關注的系，並提出具體管理建議。
+
+重要限制：不要分析一階篩選高度重合，不要把重點放在競爭對手來源重疊；本圖只看校內各系是否往第二象限方向改善。
 `;
                 } else {
                     prompt = `
@@ -1153,7 +1308,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
     useEffect(() => {
         if (!isDataReady) return;
 
-        const prefix = `${ANALYSIS_PROMPT_VERSION}_${currentYear}_${selectedDimension}_${selectedDept}_${zhengEffectThreshold}_${yieldRateThreshold}`;
+        const prefix = `${ANALYSIS_PROMPT_VERSION}_${currentYear}_${selectedDimension}_${selectedDept}_${zhengEffectThreshold}_${yieldRateThreshold}_${flowRateThreshold}_${avgScorePrThreshold}`;
         if (firedPrefixRef.current === prefix) return;
         firedPrefixRef.current = prefix;
 
@@ -1166,6 +1321,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
             { keySuffix: 'health', tabId: 'health', tType: '', qMode: '' },
             { keySuffix: 'quadrant_rscore_avg', tabId: 'quadrant', tType: '', qMode: 'rscore_avg' },
             { keySuffix: 'quadrant_effect_yield', tabId: 'quadrant', tType: '', qMode: 'effect_yield' },
+            { keySuffix: 'quadrant_flow_avg_pr', tabId: 'quadrant', tType: '', qMode: 'flow_avg_pr' },
             { keySuffix: 'timeline', tabId: 'timeline', tType: '', qMode: '' },
             { keySuffix: 'flow', tabId: 'flow', tType: '', qMode: '' }
         ];
@@ -1214,10 +1370,10 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
                 });
             }
         });
-    }, [isDataReady, selectedDept, currentYear, selectedDimension, historicalData, rankings, graphData, healthData, timelineRankData, zhengEffectThreshold, yieldRateThreshold]);
+    }, [isDataReady, selectedDept, currentYear, selectedDimension, historicalData, rankings, graphData, healthData, timelineRankData, zhengEffectThreshold, yieldRateThreshold, flowRateThreshold, avgScorePrThreshold]);
 
     const getActiveKey = () => {
-        const prefix = `${ANALYSIS_PROMPT_VERSION}_${currentYear}_${selectedDimension}_${selectedDept}_${zhengEffectThreshold}_${yieldRateThreshold}`;
+        const prefix = `${ANALYSIS_PROMPT_VERSION}_${currentYear}_${selectedDimension}_${selectedDept}_${zhengEffectThreshold}_${yieldRateThreshold}_${flowRateThreshold}_${avgScorePrThreshold}`;
         if (activeTab === 'trend') {
             return `${prefix}_trend_${trendType}`;
         }
@@ -1260,6 +1416,7 @@ ${inflowDetails.length > 0 ? inflowDetails.join('\n') : '  - 無流入數據'}
             case 'health': return 'AI 招生效益與健康度診斷';
             case 'quadrant':
                 if (quadrantMode === 'effect_yield') return 'AI 正取有效性與報到率落點診斷';
+                if (quadrantMode === 'flow_avg_pr') return 'AI 校內各系體質移動方向診斷';
                 return 'AI 校系落點定位與歷年軌跡診斷';
             case 'timeline': return 'AI 競爭時間軸演進解析';
             case 'flow': return 'AI 學生選擇流向與備取策略建議';
