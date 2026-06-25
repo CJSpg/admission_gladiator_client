@@ -229,7 +229,7 @@ const getQuadrantFlowAvgPr = (
     avgPrThreshold = DEFAULT_AVG_SCORE_PR_THRESHOLD
 ) => {
     if (flowRatePercent === null || avgScorePr === null || flowRatePercent === undefined || avgScorePr === undefined) {
-        return { name: '資料不足', desc: '無法判斷校內系科象限' };
+        return { name: '資料不足', desc: '無法判斷校內科系象限' };
     }
 
     const flowThresholdText = `${flowThreshold}%`;
@@ -856,7 +856,7 @@ const PlacementQuadrantChart = ({
                         boxShadow: mode === 'flow_avg_pr' ? '0 4px 12px rgba(231, 76, 60, 0.2)' : 'none'
                     }}
                 >
-                    🏫 校內系科體質
+                    🏫 校內科系體質
                 </button>
             </div>
 
@@ -908,39 +908,39 @@ const PlacementQuadrantChart = ({
                                 suffix: ''
                             }
                         ]).map(control => (
-                        <div key={control.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <label htmlFor={control.id} style={{ fontWeight: 'bold', color: '#334155' }}>
-                                {control.label}
-                            </label>
-                            <input
-                                id={control.id}
-                                type="range"
-                                min="0"
-                                max="100"
-                                step="5"
-                                value={control.value}
-                                onChange={(event) => control.update(event.target.value)}
-                                style={{ width: '150px', accentColor: control.color }}
-                            />
-                            <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="5"
-                                value={control.value}
-                                onChange={(event) => control.update(event.target.value)}
-                                style={{
-                                    width: '68px',
-                                    padding: '5px 8px',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '6px',
-                                    color: '#334155',
-                                    fontWeight: 'bold'
-                                }}
-                            />
-                            {control.suffix && <span>{control.suffix}</span>}
-                        </div>
-                    ))}
+                            <div key={control.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <label htmlFor={control.id} style={{ fontWeight: 'bold', color: '#334155' }}>
+                                    {control.label}
+                                </label>
+                                <input
+                                    id={control.id}
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    value={control.value}
+                                    onChange={(event) => control.update(event.target.value)}
+                                    style={{ width: '150px', accentColor: control.color }}
+                                />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    value={control.value}
+                                    onChange={(event) => control.update(event.target.value)}
+                                    style={{
+                                        width: '68px',
+                                        padding: '5px 8px',
+                                        border: '1px solid #cbd5e1',
+                                        borderRadius: '6px',
+                                        color: '#334155',
+                                        fontWeight: 'bold'
+                                    }}
+                                />
+                                {control.suffix && <span>{control.suffix}</span>}
+                            </div>
+                        ))}
                     <button
                         type="button"
                         onClick={() => {
@@ -1323,7 +1323,7 @@ const PlacementQuadrantChart = ({
                 <div style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '10px', userSelect: 'none' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <h4 style={{ margin: 0, color: '#2c3e50', fontSize: '14px', fontWeight: 'bold' }}>
-                            🔍 {mode === 'flow_avg_pr' ? '校內系科軌跡比對' : '對手軌跡比對'}（點擊或勾選，最多顯示 5 個）
+                            🔍 {mode === 'flow_avg_pr' ? '校內科系軌跡比對' : '對手軌跡比對'}（點擊或勾選，最多顯示 5 個）
                         </h4>
                         {comparedDepts.length > 0 && (
                             <button
